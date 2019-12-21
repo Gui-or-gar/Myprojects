@@ -1,0 +1,17 @@
+#librerias utilizadas
+
+library(TMB)
+library(foreign)
+library(ggplot2)
+library(dplyr)
+library(stringr)
+library(ggplot2)
+library(readxl)
+library(scales)
+library(ggpubr)
+theme_set(theme_pubclean())
+
+setwd("~/Rproject2")
+
+
+
