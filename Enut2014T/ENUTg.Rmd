@@ -1,0 +1,1205 @@
+---
+title: "Tarea 2"
+author: "Guillermo Ortiz Garin; Rafael Torres; Elizabeth Chávez"
+date: ""   
+header-includes:
+   - \usepackage{caption}
+   - \usepackage{setspace}\doublespacing
+   - \usepackage{helvet}
+   - \usepackage{fancyhdr}
+   - \usepackage{lastpage}
+   - \usepackage{nopageno}
+   - \usepackage{natbib}
+   - \usepackage{longtable}
+   - \usepackage{ltablex}
+   - \usepackage{caption, booktabs}
+   - \usepackage[utf8]{inputenc}
+   - \usepackage[T1]{fontenc}
+geometry: margin=2.54cm
+output: 
+        pdf_document: default
+        latex_engine: xelatex
+        mainfont: Times New Roman
+        html_document: default
+        word_document: default
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+# edit(mydata) 
+```
+
+```{r, include=FALSE, echo=FALSE}
+#librerias utilizadas
+
+library(TMB)
+library(foreign)
+library(ggplot2)
+library(dplyr)
+library(stringr)
+library(ggplot2)
+library(ggpubr)
+theme_set(theme_pubclean())
+
+setwd("~/Rproject2")
+```
+
+
+
+
+```{r}
+#leer archivos
+TVivien<-read.dbf("~/Rproject2/Muestrcls/Enut2014T/TVivienda.DBF", as.is = FALSE)
+
+
+THogar<- read.dbf("~/Rproject2/Muestrcls/Enut2014T/THogar.DBF", as.is = FALSE)
+
+TSDem<- read.dbf("~/Rproject2/Muestrcls/Enut2014T/TSDem.DBF", as.is = FALSE)
+
+TModulo1<- read.dbf("~/Rproject2/Muestrcls/Enut2014T/TModulo1.DBF", as.is = FALSE)
+
+TModulo2<- read.dbf("~/Rproject2/Muestrcls/Enut2014T/TModulo2.DBF", as.is = FALSE)
+
+TModulo3<- read.dbf("~/Rproject2/Muestrcls/Enut2014T/TModulo3.DBF", as.is = FALSE)
+
+TNoResid<- read.dbf("~/Rproject2/Muestrcls/Enut2014T/TNoResidentes.DBF", as.is = FALSE)
+```
+
+
+```{r}
+#Ver los nombres de todas las variables en cada base de datos
+names(TVivien)
+#Ver los nombres de todas las variables en cada base de datos
+names(THogar)
+#Ver los nombres de todas las variables en cada base de datos
+names(TSDem)
+#Ver los nombres de todas las variables en cada base de datos
+names(TModulo1)
+#Ver los nombres de todas las variables en cada base de datos
+names(TModulo2)
+#Ver los nombres de todas las variables en cada base de datos
+names(TModulo3)
+#Ver los nombres de todas las variables en cada base de datos
+names(TNoResid)
+```
+
+
+
+```{r}
+# Valores faltantes por variables
+#Primer base de datos
+colSums(is.na(TVivien))
+```
+
+# Tradicional
+
+
+## pregunta 1
+
+**Total de personas 12 años o más**
+
+
+
+```{r}
+# Eliminar duplicados
+tsdem2<-distinct(TSDem,CONTROL,VIV_SEL,HOGAR,N_REN,FAC_PER,UPM_DIS,FAC_PER, .keep_all= TRUE)
+
+# usando dplyr para saber cuales son mayores a 0 y menores a 97
+#para saber si es valor o no lo es (de acuerdo al manual)
+tsdem2<-tsdem2 %>%mutate(siv = 
+                           ifelse(as.numeric(as.character(EDAD))>= 1 &
+                                    as.numeric(as.character(EDAD))<= 96, "si 
+                                  es", "no es valor"))
+# usando dplyr para saber cuales son igual o mayores a 12 y menores a 98 años
+#para responder la primera pregunta
+tsdem2<-tsdem2 %>%mutate(siv2 = 
+                           ifelse(as.numeric(as.character(EDAD))>= 12 &
+                                    as.numeric(as.character(EDAD))<= 
+                                    98, "Mayor", "No mayor"))
+table(tsdem2$siv2)
+
+#crear un gráfico de barras
+barplot(table(tsdem2$siv2))
+```
+
+
+## pregunta 2
+
+**Total de personas 12 años o más por sexo**
+
+```{r}
+#crear variable sobre sexo del participante basado en si es mayor de 12
+tsdem2<-tsdem2 %>%mutate(may12yS = 
+                           ifelse(siv2 == "Mayor" & as.character(as.numeric(as.character(SEXO)))> 1,
+                                  "M", "H"))
+
+table(tsdem2$may12yS)
+#crear un gráfico de barras
+barplot(table(tsdem2$may12yS))
+```
+
+
+## pregunta 3
+
+**Total de personas 12 años o más por entidad federativa**
+
+
+
+```{r}
+# obtener los primeros dos dígitos para crear la variable Efeder
+tsdem2<-tsdem2 %>%mutate(EFeder = str_sub(tsdem2$CONTROL,1,2))
+#convertir a numérico
+tsdem2$EFeder<- as.numeric(tsdem2$EFeder)
+#cambiando los numeros por nombres de los estados
+Estados <- data.frame(EFeder=
+                        seq.int(from =1, to = 32,by = 1) , Nom_ef=
+                        c("Aguascalientes","Baja California",
+                          "Baja California Sur", "Campeche",
+                          "Coahuila de Zaragoza", "Colima", "Chiapas", 
+                          "Chihuahua", "Distrito Federal",
+                          "Durango", "Guanajuato", "Guerrero",
+                          "Hidalgo", "Jalisco", "México",
+                          "Michoacán de Ocampo","Morelos", "Nayarit",
+                          "Nuevo León", "Oaxaca", "Puebla", "Querétaro",
+                          "Quintana Roo", "San Luis Potosí", "Sinaloa",
+                          "Sonora", "Tabasco", "Tamaulipas", "Tlaxcala",
+                          "Veracruz de Ignacio de la Llave", "Yucatán",
+                          "Zacatecas"))
+
+
+#Coincidir la lista con los valores de la base de datos
+tsdem2<-merge(tsdem2, Estados, by.x="EFeder", by.y="EFeder")
+
+```
+
+```{r}
+table(tsdem2$Nom_ef)
+#imprimir el gráfico con etiquetas
+x <- barplot(table(tsdem2$Nom_ef), xaxt="n")
+labs <- paste(names(table(tsdem2$Nom_ef)))
+text(cex=.7, x=x-.25, y=-1.25, labs, xpd=TRUE, srt=90)
+
+```
+
+
+## pregunta 4
+
+**Total de personas 12 años o más por sexo por entidad federativa**
+
+```{r}
+
+table(tsdem2$Nom_ef,tsdem2$may12yS)
+
+#imprimir el gráfico con etiquetas
+x <- barplot(table(tsdem2$may12yS,tsdem2$Nom_ef), xaxt="n", col = c("blue", "red"))
+legend("topleft", legend = c("Hombre","Mujer"), pch = 18, col =c("blue", "red"), cex = 0.6)
+labs <- paste(names(table(tsdem2$Nom_ef)))
+text(cex=.7, x=x-.25, y=-1.25, labs, xpd=TRUE, srt=90)
+
+
+```
+
+
+
+
+
+
+De acuerdo a lo investigado las personas de 12 años o mayores contestaron los módulos, sin embargo, al filtrar nuestros datos de acuerdo a los criterios de tener 12 años o más obtuvimos 42540 observaciones pese a que en la base de datos de los módulos el total de observaciones es de 42118. Pensamos que hubo 422 que no contestaron las preguntas de los módulos, por esa razón, basado en los códigos de $CONTROL$,$HOGAR$,$N_REN$, $VIV_SEL$ de la base de datos $Tmodulo1$, encontramos a los sujetos en $TSDEM$.
+
+```{r}
+#los que si son mayores de 12 del total de los 56274 de acuerdo a lo encontrado
+tsdem3<-tsdem2 %>% dplyr::select(CONTROL,
+         HOGAR,N_REN,PAREN,SEXO,EDAD,P3_6,P3_7,P3_8,P3_9,
+         VIV_SEL,P3_10,P3_11_3,TLOC,UPM_DIS,EDIS, FAC_VIV,FAC_PER,siv,siv2,
+        may12yS,EFeder)%>% filter(tsdem2$siv2 == "Mayor")
+
+#número de filas
+nrow(tsdem3)
+
+
+```
+
+Por otra parte, concluimos que al parecer no hay datos faltantes en ninguno de los módulos (a comparación de TSDem) ya que los NA's siguen un patrón debido a la estructura de las preguntas, por ejemplo, si se preguntó acerca de una actividad y el participante no realizó dicha actividad se dejaba en blanco a propósito, por lo tanto, no son consideradas valores faltantes. Es posible que las observaciones incluidas en los 3 módulos siguientes son aquellas personas que contestaron todas las preguntas de acuerdo a los criterios del cuestionario.  
+
+
+## pregunta 5
+
+**Total de personas de 12 años o mas que realizan actividades productivas**
+
+
+```{r,echo=FALSE, include=FALSE}
+library(readxl)
+library(scales)
+```
+
+
+```{r}
+
+#se hicieron coincidir las observaciones de TSDem con las de Tmodulo1
+
+Tmodul1_1<-merge(tsdem2, TModulo1, by.x= c("CONTROL","VIV_SEL","HOGAR",
+                                        "N_REN", "FAC_PER", "UPM_DIS",
+                                        "FAC_PER"),by.y=c("CONTROL",
+                                       "VIV_SEL", "HOGAR", "N_REN",
+                                          "FAC_PER","UPM_DIS",
+                                           "FAC_PER"))
+
+```
+
+```{r,include=FALSE,echo=FALSE}
+#Al transformar las bases de datos de DBF a data frame
+#los valores fueron transformados a factor y trasnformarlos a numericos uno
+#por uno resultaba complicado por lo que para hacer las operaciones
+#primero lo convertimos a CSV para que fuera menos compicado
+write.csv(Tmodul1_1,'C:\\Users\\Memo\\Documents\\Rproject2\\Tmodul1_1.csv', row.names = FALSE)
+
+#leer la base que acabamos de crear
+Tmodul1_1 <- read.csv("~/Rproject2/Tmodul1_1.csv", header=TRUE, stringsAsFactors=FALSE)
+```
+
+
+```{r}
+
+#Al transformar las bases de datos de DBF a data frame
+#los valores fueron transformados a factor y trasnformarlos a numericos uno
+#por uno resultaba complicado por lo que para hacer las operaciones
+#primero lo convertimos a CSV para que fuera menos compicado
+
+#write.csv(Tmodul1_1,'~\\Rproject2\\Tmodul1_1.csv', row.names = FALSE)
+
+#leer la base que acabamos de crear
+#Tmodul1_1 <- read.csv("~/Rproject2/Tmodul1_1.csv", header=TRUE, stringsAsFactors=FALSE)
+
+#Realiza actividades productivas
+Tmodul1_1<-Tmodul1_1 %>%mutate(ActPro = 
+                                 ifelse(Tmodul1_1$P5_1== 1, "Si", "No"))
+
+#es remunerada
+Tmodul1_1<-Tmodul1_1 %>%mutate(Tremun = 
+                                 ifelse(Tmodul1_1$P5_7_1>= 1 & Tmodul1_1$P5_7_1
+                                        < 99999, "Si", ifelse(Tmodul1_1$P5_7_1
+                                                        == 0, "No",
+                                                        "No resp")))
+table(Tmodul1_1$ActPro)
+
+barplot(table(Tmodul1_1$ActPro),col = c("gray","red"))
+```
+
+
+
+
+## pregunta 6
+
+**Proporción de personas de 12 años o más que realizan actividades productivas por sexo**
+
+
+```{r}
+#crear variable prop
+Tmodul1_1 %>% count(may12yS, ActPro) %>% mutate(prop = prop.table(n)) 
+
+#Gráfica de barras
+ggplot(Tmodul1_1, 
+        aes(ActPro, fill=ActPro)) + geom_bar(aes(y=..count../sum(..count..))) +
+   scale_y_continuous() +facet_grid(~may12yS)+theme_bw() + 
+  labs(title="Proporción trabajo remunerado por sexo", y="Proporción")
+```
+
+
+## pregunta 7
+
+**Proporción de personas de 12 años o más que realizan actividades productivas por sexo por entidad federativa**
+
+
+
+```{r, fig.width =12 , fig.height= 12}
+Tmodul1_1$Nom_ef<- factor(Tmodul1_1$Nom_ef)
+
+#filtrar si actividad productiva y obtener proporción
+Tmodul1_1 %>% filter(ActPro ==
+                       "Si")%>% count(may12yS,
+                                      ActPro,
+                                      Nom_ef)%>%mutate(prop=prop.table(n)) 
+
+#Gráfica de barras
+ggplot(Tmodul1_1%>% filter(ActPro == "Si"), 
+        aes(Nom_ef, fill=may12yS)) +
+  geom_bar(aes(y=..count../sum(..count..))) +
+  scale_y_continuous() +facet_grid(~ActPro)+theme_bw() +
+  labs(title=
+         "Proporción trabajo remunerado por estado y sexo", y="Proporción") +
+  theme(axis.text.x = element_text(angle = 45))
+```
+
+
+
+
+  
+
+## pregunta 8
+
+**Total personas de 12 años o más que realizan actividades productivas no remuneradas**
+
+
+```{r}
+#Con base en la variable creada "Tremun" de la pregunta 5
+table(Tmodul1_1$Tremun)
+
+barplot(table(Tmodul1_1$Tremun), col = c("red","gray","gray"))
+```
+
+
+
+## pregunta 9
+
+**Proporción de personas de 12 años o más que realizan actividades productivas no remuneradas por sexo**
+
+```{r}
+#Filtrar por atividades no remuneradas y sexo
+Tmodul1_1 %>% filter(Tremun == "No")%>% count(may12yS, Tremun) %>% mutate(prop = prop.table(n)) 
+
+#plot
+ggplot(Tmodul1_1 %>% filter(Tremun == "No"), 
+        aes(may12yS, fill=may12yS)) + geom_bar(aes(y=..count../sum(..count..))) +
+   scale_y_continuous() + labs(title="Proporción trabajo no remunerado por sexo", y="Proporción")
+
+```
+
+
+
+## Pregunta 10
+
+**Proporción de personas de 12 años o más que realizan actividades productivas no remuneradas por entidad federativa**
+
+
+```{r, fig.width =12 , fig.height= 12}
+#Filtrar por atividades no remuneradas y Nom_ef; ver proporción
+Outp<-Tmodul1_1 %>% filter(Tremun == "No")%>% count(Nom_ef, Tremun) %>% mutate(prop = prop.table(n))
+# imprimir todos los valores
+print(tbl_df(Outp), n=30)
+
+
+#crear gráfico
+ggplot(Tmodul1_1%>% filter(Tremun ==
+                             "No"), aes(Nom_ef, fill=Nom_ef))+
+  geom_bar(aes(y=..count../sum(..count..)))+
+  scale_y_continuous()+ 
+  labs(title="Proporción trabajo no remunerado por E. F.", y="Proporción")+
+  theme(axis.text.x = element_text(angle = 45))
+
+
+```
+
+
+
+
+## Pregunta 11
+
+**Proporción de personas de 12 años o más que realizan actividades productivas no remuneradas por sexo por entidad federativa**
+
+```{r, fig.width =12 , fig.height= 12}
+#Filtrar por atividades no remuneradas,sexo y Nom_ef; ver proporción
+Tmodul1_1 %>% filter(Tremun ==
+                       "No")%>% count(may12yS,
+                                      Tremun,Nom_ef) %>% mutate(prop =
+                                                                prop.table(n)) 
+
+#Gráfico
+ggplot(Tmodul1_1%>% filter(Tremun == "No"), 
+        aes(Nom_ef, fill=may12yS)) + geom_bar(aes(y=..count../sum(..count..))) +
+   scale_y_continuous() +facet_grid(~Tremun)+theme_bw() + 
+  labs(title=
+         "Proporción trabajo no remunerado por estado y sexo", y=
+         "Proporción") + theme(axis.text.x = element_text(angle = 45))
+```
+
+
+
+
+
+## pregunta 12
+
+**Promedio de horas semanales dedicadas a actividades productivas por personas de 12 o más años**
+
+Asumimos que las preguntas están seriadas, por lo tanto el promedio de horas semanales dedicadas a actividades productivas son las relacionadas al trabajo, es decir, la sección V
+
+```{r}
+#crear un ID de las observaciones
+Tmodul1_1$ID <-seq.int(nrow(Tmodul1_1))
+
+#Horas modulo uno (ordenadas)
+TmodulHT<-Tmodul1_1 %>% dplyr::select(ID,CONTROL,VIV_SEL,HOGAR,N_REN,
+                                      P5_3_1, P5_3_3, P5_4_1, P5_4_3,
+                                      P5_9_1, P5_9_3, P6_3_1_2,
+                                      P6_3_1_4,P6_3_2_2,P6_3_2_4, P6_3_3_2,
+                                      P6_3_3_4, P6_3_4_2, P6_3_4_4, P6_3_5_2,
+                                      P6_3_5_4, P6_3_6_2, P6_3_6_4, P6_3_7_2,
+                                      P6_3_7_4, P6_3_8_2, P6_3_8_4, P6_3_9_2,
+                                      P6_3_9_4,may12yS,Nom_ef,ActPro, Tremun,
+                                      P6_4_1_2, P6_4_1_4, P6_4_2_2, P6_4_2_4,
+                                      P6_4_3_2, P6_4_3_4, P6_4_4_2, P6_4_4_4,
+                                      P6_4_5_2, P6_4_5_4, P6_5_1_2, P6_5_1_4,
+                                      P6_5_2_2, P6_5_2_4,  P6_5_3_2, P6_5_3_4,
+                                      P6_5_4_2, P6_5_4_4, P6_5_5_2, P6_5_5_4,
+                                      P6_6_1_2, P6_6_1_4,  P6_6_2_2, P6_6_2_4,
+                                      P6_6_3_2, P6_6_3_4, P6_6_4_2, P6_6_4_4,
+                                      P6_6_5_2, P6_6_5_4, P4_1)
+
+#convertir base a CSV para mayor facilidad
+#write.csv(TmodulHT,'~\\Rproject2\\TmodulHTN.csv', row.names = FALSE)
+#leer datos
+#TmodulHT <- read.csv("~/Rproject2/TmodulHTN.csv", header=TRUE, stringsAsFactors=FALSE)
+
+```
+
+```{r, include=FALSE, echo=FALSE}
+#convertir base a CSV para mayor facilidad
+write.csv(TmodulHT,'C:\\Users\\Memo\\Documents\\Rproject2\\TmodulHTN.csv', row.names = FALSE)
+#leer datos
+TmodulHT <- read.csv("~/Rproject2/TmodulHTN.csv", header=TRUE, stringsAsFactors=FALSE)
+```
+
+```{r}
+#Horas modulo dos
+
+Tmodul1_2<-TModulo2
+
+TmodulHT2<-Tmodul1_2 %>% dplyr::select(CONTROL,VIV_SEL,HOGAR,N_REN,
+                                       P6_7_1_2, P6_7_1_4, P6_7_2_2, P6_7_2_4,
+                                       P6_7_3_2, P6_7_3_4, P6_7_4_2, P6_7_4_4,
+                                       P6_8_1_2, P6_8_1_4, P6_8_2_2, P6_8_2_4,
+                                       P6_8_3_2, P6_8_3_4, P6_9_1_2, P6_9_1_4,
+                                       P6_9_2_2, P6_9_2_4, P6_9_3_2, P6_9_3_4,
+                                       P6_10_1_2, P6_10_1_4,  P6_10_2_2,
+                                       P6_10_2_4,  P6_10_3_2, P6_10_3_4,
+                                       P6_10_4_2, P6_10_4_4,  P6_10_5_2,
+                                       P6_10_5_4,  P6_10_6_2, P6_10_6_4,
+                                       P6_10_7_2, P6_10_7_4)
+
+#convertir base a CSV para mayor facilidad
+#write.csv(TmodulHT2,'~\\Rproject2\\TmodulHTN2.csv', row.names = FALSE)
+
+#TmodulHT2 <- read.csv("~/Rproject2/TmodulHTN2.csv", header=TRUE, stringsAsFactors=FALSE)
+
+
+```
+
+```{r, include=FALSE, echo=FALSE}
+#convertir base a CSV para mayor facilidad
+write.csv(TmodulHT2,'C:\\Users\\Memo\\Documents\\Rproject2\\TmodulHTN2.csv', row.names = FALSE)
+
+TmodulHT2 <- read.csv("~/Rproject2/TmodulHTN2.csv", header=TRUE, stringsAsFactors=FALSE)
+```
+
+```{r}
+
+TmodulHT<- TmodulHT %>% replace(is.na(.), 0) %>% mutate(HTP5 =
+                                                           rowSums(.[6:11]))
+
+TmodulHT<- TmodulHT %>% replace(is.na(.), 0) %>% mutate(HTP6H =
+                                                           rowSums(.[12:29]))
+
+TmodulHT <- TmodulHT %>% replace(is.na(.), 0) %>% mutate(HTT14 =
+                                                           rowSums(.[65:66]))
+```
+
+
+
+
+```{r,include=FALSE, echo=FALSE}
+hist(na.omit(TmodulHT$HTP5), freq = F, breaks = 20, main =
+       "Histograma de horas de trabajo y promedio")
+abline(v = mean(na.omit(TmodulHT$HTP5)), lwd= 3, col= "red")
+lines(density(na.omit(TmodulHT$HTP5)), lwd=2, col= "blue")
+
+```
+
+
+La suma de horas de las horas de trabajo entre semana y fin de semana (P5_3_1 y P5_3_3); la suma de horas de horas dedicadas al traslado (P5_4_1 y P5_4_3) y las horas dedicadas a las actividades de la sección 5.8 (P5_9_1, P5_9_3) son el total de HORAS de actividades para el mercado: HTP5. La variable anterior representa el total de horas de la sección V. 
+
+```{r}
+
+mean(na.omit(TmodulHT$HTP5))
+```
+
+
+
+
+## Pregunta 13
+
+**Promedio de horas semanales dedicadas a actividades productivas por personas de 12 o más años, por sexo**
+
+
+Asumiendo que las horas productivas son todas aquellas de a sección V
+```{r}
+TmodulHT %>% group_by(may12yS)%>% summarise(mean(na.omit(HTP5)))
+
+```
+
+
+
+## pregunta 14
+
+**Promedio de horas semanales dedicadas a actividades para el mercado y bienes de autoconsumo por personas de 12 o más años, por sexo**
+
+
+
+Consideramos que las preguntas que se relacionan con las horas dedicadas a actividades de "producción de bienes para el propio hogar" son las siguientes:
+P6_3_1_2,P6_3_1_4,P6_3_2_2,P6_3_2_4, P6_3_3_2, P6_3_3_4, P6_3_4_2, P6_3_4_4, P6_3_5_2, P6_3_5_4, P6_3_6_2, P6_3_6_4, P6_3_7_2, P6_3_7_4, P6_3_8_2,
+P6_3_8_4, P6_3_9_2, P6_3_9_4
+
+Por esa razón, creamos la variable HTP6 como la suma de las horas de todas las variables mencionadas.
+
+
+Para esta pregunta, sumamos el total de las horas de mercado (HTP5) con las de producción de bienes para el propio hogar (HTP6) para crear HTT14.
+
+```{r}
+TmodulHT %>% group_by(may12yS)%>% summarise(mean(na.omit(HTT14)))
+```
+
+## pregunta 15
+
+**Promedio de horas semanales dedicadas a trabajo no remunerado por personas de 12 o más años, por sexo**
+
+Asumiendo que no se cuenta el tiempo de traslado ni las horas dedicadas a las actividades 5.8:
+
+```{r}
+HTrab<- TmodulHT %>% replace(is.na(.), 0) %>% mutate(THTrab =
+                                                           rowSums(.[6:7]))
+
+HTrab%>% filter(Tremun == "No")%>% 
+  group_by(may12yS) %>% summarise(mean(na.omit(THTrab)))
+```
+
+## pregunta 16
+
+**Trabajo doméstico no remunerado para el propio hogar de personas de 12 o más años**
+
+
+De acuerdo a la información del ENUT 2014, consideramos que el trabajo doméstico para el propio hogar no remunerado es la suma total de actividades realizadas desde la sección 6.4 a la 6.10. Cambiamos los valores de "2" por el valor"0" de esa forma pudimos hacer la suma de actividades que realizan en las siguientes variables: P6_4_1_1,  P6_4_2_1,   P6_4_3_1,   P6_4_4_1,  P6_4_5_1,  P6_5_1_1,  P6_5_2_1,  P6_5_3_1,  P6_5_4_1,  P6_5_5_1,  P6_6_1_1,  P6_6_2_1, P6_6_3_1,  P6_6_4_1,  P6_6_5_1,  P6_7_1_1,  P6_7_2_1,  P6_7_3_1,   P6_7_4_1, P6_8_1_1,  P6_8_2_1,  P6_8_3_1,  P6_9_1_1,  P6_9_2_1,  P6_9_3_1,   P6_10_1_1, P6_10_2_1,  P6_10_3_1,  P6_10_4_1,  P6_10_5_1,  P6_10_6_1,  P6_10_7_1
+
+```{r}
+
+#Actividades modulo uno
+Tmodul1AC<-Tmodul1_1 %>% dplyr::select(ID,CONTROL,VIV_SEL,HOGAR,
+                                       N_REN, may12yS,Nom_ef,ActPro,
+                                       Tremun,P6_4_1_1,P6_4_2_1,P6_4_3_1,
+                                       P6_4_4_1,  P6_4_5_1,P6_5_1_1, P6_5_2_1,
+                                       P6_5_3_1,P6_5_4_1, P6_5_5_1,P6_6_1_1,
+                                       P6_6_2_1, P6_6_3_1,P6_6_4_1,P6_6_5_1)
+
+#convertir base a CSV para mayor facilidad
+#write.csv(Tmodul1AC,'~\\Rproject2\\Tmodul1ACN.csv', row.names = FALSE)
+
+#Tmodul1AC <- read.csv("~/Rproject2/Tmodul1ACN.csv", header=TRUE, stringsAsFactors=FALSE)
+```
+
+```{r, include=FALSE, echo=FALSE}
+write.csv(Tmodul1AC,'C:\\Users\\Memo\\Documents\\Rproject2\\Tmodul1ACN.csv', row.names = FALSE)
+
+Tmodul1AC <- read.csv("~/Rproject2/Tmodul1ACN.csv", header=TRUE, stringsAsFactors=FALSE)
+```
+
+
+```{r}
+
+#Actividades modulo dos
+
+Tmodul1_2<-TModulo2
+
+
+Tmodul2AC<-Tmodul1_2 %>% dplyr::select(CONTROL,VIV_SEL,HOGAR,
+                                       N_REN,P6_7_1_1,P6_7_2_1,P6_7_3_1,
+                                       P6_7_4_1, P6_8_1_1,  P6_8_2_1,
+                                       P6_8_3_1,  P6_9_1_1,  P6_9_2_1,
+                                       P6_9_3_1, P6_10_1_1, P6_10_2_1,
+                                       P6_10_3_1,  P6_10_4_1,  P6_10_5_1,
+                                       P6_10_6_1,  P6_10_7_1)
+
+#convertir base a CSV para mayor facilidad
+#write.csv(Tmodul2AC,'~\\Rproject2\\Tmodul2ACN.csv', row.names = FALSE)
+
+#Tmodul2AC <- read.csv("~/Rproject2/Tmodul2ACN.csv", header=TRUE, stringsAsFactors=FALSE)
+```
+
+```{r, include=FALSE, echo=FALSE}
+write.csv(Tmodul2AC,'C:\\Users\\Memo\\Documents\\Rproject2\\Tmodul2ACN.csv', row.names = FALSE)
+
+Tmodul2AC <- read.csv("~/Rproject2/Tmodul2ACN.csv", header=TRUE, stringsAsFactors=FALSE)
+```
+
+```{r}
+
+TmodulAC<-merge(Tmodul1AC, Tmodul2AC, by.x=c("CONTROL","VIV_SEL",
+                                             "HOGAR","N_REN"),
+                by.y=c("CONTROL","VIV_SEL","HOGAR", "N_REN"))
+
+#cambiar los valore "2" a cero para realizar la suma por filas y columas
+TmodulAC[ ,10:41 ][ TmodulAC[ ,10:41 ] == 2 ] <- 0
+
+TmodulAC<- TmodulAC %>% replace(is.na(.), 0) %>% mutate(NumTr =
+                                                           rowSums(.[10:41]))
+
+```
+
+Posteriormente creamos una variable NumTr la cual es la suma de los "1" es decir, cuantas actividades domésticas realizan, a continuación presentamos la distribución de dichos datos:
+
+
+
+
+```{r}
+
+TmodulAC %>% count(Suma_total_casos = sum(NumTr))
+
+hist(TmodulAC$NumTr, freq = F, breaks = 50)
+
+mean(na.omit(TmodulAC$NumTr))
+
+abline(v = mean(na.omit(TmodulAC$NumTr)), lwd= 3, col= "red")
+
+```
+
+
+## pregunta 17
+
+**Trabajo doméstico no remunerado para el propio hogar de personas de 12 o más años por sexo**
+
+```{r}
+#Total
+TmodulAC %>% group_by(may12yS)%>% count(Suma_total_casos = sum(NumTr))
+
+# num de actividades por sexo
+
+TmodulAC %>% group_by(may12yS, NumTr)%>% count()
+
+
+ggplot(TmodulAC, 
+        aes(NumTr, fill=NumTr)) + geom_bar(aes(y=..count..)) +
+   scale_y_continuous() +facet_grid(~may12yS)+theme_bw() + 
+  labs(title="num de actividades por sexo", y="n casos")
+
+```
+
+
+## pregunta 18
+
+**Trabajo doméstico no remunerado para el propio hogar de personas de 12 o más años desglosado por tipo de actividad**
+
+
+```{r}
+TmodulAC$CONTROL <- factor(TmodulAC$CONTROL)
+TmodulAC$HOGAR <- factor(TmodulAC$HOGAR)
+TmodulAC$N_REN <- factor(TmodulAC$N_REN)
+TmodulAC$VIV_SEL <- factor(TmodulAC$VIV_SEL)
+TmodulAC$may12yS <- factor(TmodulAC$may12yS)
+TmodulAC$Nom_ef <- factor(TmodulAC$Nom_ef)
+TmodulAC$ActPro <- factor(TmodulAC$ActPro)
+TmodulAC$Tremun <- factor(TmodulAC$Tremun)
+
+
+Resultado <- TmodulAC %>%  summarise_if(is.numeric, sum, na.rm = TRUE)
+
+
+```
+
+* P6_4_1_1
+desgranó maíz, coció o molió el nixtamal o hizo tortillas de maíz o trigo para su hogar?
+* P6_4_2_1
+encendió el fogón, horno o anafre de leña o carbón para preparar o calentar
+alimentos?
+* P6_4_3_1
+ cocinó, preparó o calentó alimentos o bebidas?
+* P6_4_4_1
+ sirvió la comida, recogió, lavó, secó o acomodó los trastes?
+* P6_4_5_1
+ llevó comida a algún integrante de su hogar a la escuela, trabajo u otro lugar?
+* P6_5_1_1
+ barrió la banqueta, cochera o patio de su vivienda?.
+* P6_5_2_1
+ limpió o recogió el interior de su vivienda? (ordenar objetos, tender camas, barrer, trapear, sacudir, lavar la cocina, el baño, entre otros).
+* P6_5_3_1
+ recogió, separó, tiró o quemó la basura? 
+ 
+```{r}
+Resultado[,2:9]
+```
+
+...
+
+* P6_5_4_1
+cuidó o regó macetas y plantas de su patio o jardín?
+* P6_5_5_1
+limpió, alimentó o cuidó a la(s) mascota(s) (animales de compañía) de su hogar?.
+* P6_6_1_1
+ lavó, tendió o puso a secar la ropa? (si lo hizo con máquina, quite el tiempo de operación)
+* P6_6_2_1
+ planchó la ropa?
+* P6_6_3_1
+ separó, dobló, acomodó o guardó la ropa?
+* P6_6_4_1
+ arregló o remendó la ropa, manteles, cortinas o sábanas (excluya confección)?
+* P6_6_5_1
+ limpió, boleó o pintó el calzado? (tenis, huaraches, botas, etc.)
+* P6_7_1_1
+reparó o hizo alguna instalación menor a su vivienda?
+
+```{r}
+Resultado[,10:17]
+```
+
+...
+
+* P6_7_2_1
+ reparó muebles, juguetes, aparatos domésticos o computadora de su hogar?
+* P6_7_3_1
+ lavó o limpió algún medio de transporte de su hogar? (bicicleta, moto, camioneta, automóvil)
+* P6_7_4_1
+reparó o dio mantenimiento a algún medio de transporte de su hogar? (bicicleta, moto, camioneta, automóvil)
+* P6_8_1_1
+ buscó o compró refacciones, llantas, herramientas o materiales de construcción, automóvil, casa o terreno?
+* P6_8_2_1
+ buscó o hizo las compras del mandado, la despensa, papelería, medicinas o artículos de limpieza?
+* P6_8_3_1
+ buscó o compró artículos o bienes para su hogar como trastes, manteles, muebles, ropa, calzado u otros?
+* P6_9_1_1
+hizo pagos o trámites de servicios para su hogar? (incluya si lo hizo por internet)
+(tenencia, predial, agua, luz, credencial de elector, colegiatura, crédito hipotecario, caja de ahorro, renta, actas, CURP, pasaporte, denuncias, etc.)
+* P6_9_2_1
+ llevó los gastos (cuentas) de su hogar?
+
+```{r}
+Resultado[,18:25]
+```
+
+...
+
+* P6_9_3_1
+ tramitó o cobró algún programa social? (pensión para adultos mayores, tarjeta LICONSA, etc.)
+* P6_10_1_1
+ llevó o recogió ropa o calzado a algún lugar para su limpieza o reparación? 
+*P6_10_2_1
+ supervisó la construcción, reparación o mantenimiento de su vivienda? 
+* P6_10_3_1
+llevó o supervisó la reparación de muebles, juguetes, aparatos domésticos
+o computadora de su hogar? . 
+* P6_10_4_1
+ llevó a que lavaran, repararan o dieran mantenimiento a algún medio de transporte de su hogar? (bicicleta, moto, camioneta, automóvil)
+* P6_10_5_1
+ cerró puertas, ventanas, puso candados u otras medidas para proteger sus bienes y su vivienda? (guardó el auto, encendió la alarma)
+
+```{r}
+Resultado[,26:31]
+```
+
+...
+
+* P6_10_6_1
+ esperó el gas, la pipa de agua, el camión de basura u otro servicio sin hacer otra actividad? 
+* P6_10_7_1
+ organizó o repartió los quehaceres de su hogar? (indicó qué hacer de comer, supervisó la limpieza de su vivienda, etc.).
+
+```{r}
+Resultado[,32:33]
+```
+
+
+
+
+
+
+
+## pregunta 19 
+
+**Trabajo doméstico no remunerado para el propio hogar de personas de 12 o más años desglosado por tipo de actividad por sexo**
+
+
+
+```{r}
+Resultado <- TmodulAC %>% group_by(may12yS)%>% summarise_if(is.numeric,
+                                                     sum, na.rm = TRUE)
+```
+
+* P6_4_1_1
+desgranó maíz, coció o molió el nixtamal o hizo tortillas de maíz o trigo para su hogar?
+* P6_4_2_1
+encendió el fogón, horno o anafre de leña o carbón para preparar o calentar
+alimentos?
+* P6_4_3_1
+ cocinó, preparó o calentó alimentos o bebidas?
+* P6_4_4_1
+ sirvió la comida, recogió, lavó, secó o acomodó los trastes?
+* P6_4_5_1
+ llevó comida a algún integrante de su hogar a la escuela, trabajo u otro lugar?
+* P6_5_1_1
+ barrió la banqueta, cochera o patio de su vivienda?.
+* P6_5_2_1
+ limpió o recogió el interior de su vivienda? (ordenar objetos, tender camas, barrer, trapear, sacudir, lavar la cocina, el baño, entre otros).
+
+
+```{r}
+Resultado[,c(1,3:9)]
+```
+
+...
+
+* P6_5_3_1
+ recogió, separó, tiró o quemó la basura? 
+* P6_5_4_1
+cuidó o regó macetas y plantas de su patio o jardín?
+* P6_5_5_1
+limpió, alimentó o cuidó a la(s) mascota(s) (animales de compañía) de su hogar?.
+* P6_6_1_1
+ lavó, tendió o puso a secar la ropa? (si lo hizo con máquina, quite el tiempo de operación)
+* P6_6_2_1
+ planchó la ropa?
+* P6_6_3_1
+ separó, dobló, acomodó o guardó la ropa?
+* P6_6_4_1
+ arregló o remendó la ropa, manteles, cortinas o sábanas (excluya confección)?
+
+
+```{r}
+Resultado[,c(1,10:16)]
+```
+
+...
+
+* P6_6_5_1
+ limpió, boleó o pintó el calzado? (tenis, huaraches, botas, etc.)
+* P6_7_1_1
+reparó o hizo alguna instalación menor a su vivienda?
+* P6_7_2_1
+ reparó muebles, juguetes, aparatos domésticos o computadora de su hogar?
+* P6_7_3_1
+ lavó o limpió algún medio de transporte de su hogar? (bicicleta, moto, camioneta, automóvil)
+* P6_7_4_1
+reparó o dio mantenimiento a algún medio de transporte de su hogar? (bicicleta, moto, camioneta, automóvil)
+* P6_8_1_1
+ buscó o compró refacciones, llantas, herramientas o materiales de construcción, automóvil, casa o terreno?
+* P6_8_2_1
+ buscó o hizo las compras del mandado, la despensa, papelería, medicinas o artículos de limpieza?
+
+
+```{r}
+Resultado[,c(1,17:23)]
+```
+
+...
+
+* P6_8_3_1
+ buscó o compró artículos o bienes para su hogar como trastes, manteles, muebles, ropa, calzado u otros?
+* P6_9_1_1
+hizo pagos o trámites de servicios para su hogar? (incluya si lo hizo por internet)
+(tenencia, predial, agua, luz, credencial de elector, colegiatura, crédito hipotecario, caja de ahorro, renta, actas, CURP, pasaporte, denuncias, etc.)
+* P6_9_2_1
+ llevó los gastos (cuentas) de su hogar?
+* P6_9_3_1
+ tramitó o cobró algún programa social? (pensión para adultos mayores, tarjeta LICONSA, etc.)
+* P6_10_1_1
+ llevó o recogió ropa o calzado a algún lugar para su limpieza o reparación? 
+*P6_10_2_1
+ supervisó la construcción, reparación o mantenimiento de su vivienda? 
+
+```{r}
+Resultado[,c(1,24:29)]
+```
+
+...
+
+* P6_10_3_1
+llevó o supervisó la reparación de muebles, juguetes, aparatos domésticos
+o computadora de su hogar? . 
+* P6_10_4_1
+ llevó a que lavaran, repararan o dieran mantenimiento a algún medio de transporte de su hogar? (bicicleta, moto, camioneta, automóvil)
+* P6_10_5_1
+ cerró puertas, ventanas, puso candados u otras medidas para proteger sus bienes y su vivienda? (guardó el auto, encendió la alarma) 
+* P6_10_6_1
+ esperó el gas, la pipa de agua, el camión de basura u otro servicio sin hacer otra actividad? 
+* P6_10_7_1
+ organizó o repartió los quehaceres de su hogar? (indicó qué hacer de comer, supervisó la limpieza de su vivienda, etc.).
+
+
+```{r}
+Resultado[,c(1,30:34)]
+```
+
+## Pregunta 20
+
+**Tiempo total semanal de trabajo para el mercado, producción de bienes para uso exclusivo del hogar y trabajo no remunerado en los hogares por sexo (personas de 12 o más años)**
+
+
+```{r}
+#Horas totales
+TmodulHTHN2C<-merge(TmodulHT, TmodulHT2, by.x=c("CONTROL","VIV_SEL",
+                                                "HOGAR","N_REN"),
+                    by.y=c("CONTROL","VIV_SEL","HOGAR", "N_REN"))
+
+TmodulHTHN2C <- TmodulHTHN2C %>% replace(is.na(.), 0) %>% mutate(HTPN5 = rowSums(.[c(34:63,68:101)]))
+
+
+```
+
+
+```{r}
+#Minutos mercado y bienes de autoconsumo
+TmodulMT<-Tmodul1_1 %>% dplyr::select(CONTROL,VIV_SEL,HOGAR,N_REN,
+                                      P5_3_2, P5_3_4, P5_4_2,
+                                      P5_4_4,P5_9_2, P5_9_4,
+                                      P6_3_1_3, P6_3_1_5,
+                                      P6_3_2_3, P6_3_2_5, P6_3_3_3,
+                                      P6_3_3_5, P6_3_4_3, P6_3_4_5,
+                                      P6_3_5_3, P6_3_5_5, P6_3_6_3,
+                                      P6_3_6_5, P6_3_7_3, P6_3_7_5,
+                                      P6_3_8_3, P6_3_8_5, P6_3_9_3, P6_3_9_5)
+
+TmodulMT <- TmodulMT %>% replace(is.na(.), 0) %>% mutate(MTP5 = rowSums(.[5:10]))
+
+TmodulMT <- TmodulMT %>% replace(is.na(.), 0) %>% mutate(MTP6H = rowSums(.[11:28]))
+
+TmodulMT <- TmodulMT %>% replace(is.na(.), 0) %>% mutate(MTT14 = rowSums(.[29:30]))
+
+```
+
+
+
+```{r}
+#Minutos Mintutos trabajo no remunerado hogar
+TmodulMTHN<-Tmodul1_1 %>% dplyr::select(CONTROL,VIV_SEL,HOGAR,N_REN,
+                                        P6_4_1_3, P6_4_1_5, P6_4_2_3,
+                                        P6_4_2_5, P6_4_3_3, P6_4_3_5,
+                                        P6_4_4_3, P6_4_4_5, P6_4_5_3,
+                                        P6_4_5_5, P6_5_1_3, P6_5_1_5,
+                                        P6_5_2_3, P6_5_2_5, P6_5_3_3,
+                                        P6_5_3_5, P6_5_4_3, P6_5_4_5,
+                                        P6_5_5_3, P6_5_5_5, P6_6_1_3,
+                                        P6_6_1_5, P6_6_2_3, P6_6_2_5,
+                                        P6_6_3_3, P6_6_3_5, P6_6_4_3,
+                                        P6_6_4_5, P6_6_5_3, P6_6_5_5)
+
+
+
+TmodulMTHN2<-TModulo2 %>% dplyr::select(CONTROL,VIV_SEL,HOGAR,N_REN,
+                                          P6_7_1_3, P6_7_1_5, P6_7_2_3,
+                                          P6_7_2_5, P6_7_3_3, P6_7_3_5,
+                                          P6_7_4_3, P6_7_4_5, P6_8_1_3,
+                                          P6_8_1_5, P6_8_2_3, P6_8_2_5,
+                                          P6_8_3_3, P6_8_3_5, P6_9_1_3,
+                                          P6_9_1_5, P6_9_2_3, P6_9_2_5,
+                                          P6_9_3_3, P6_9_3_5, P6_10_1_3,
+                                          P6_10_1_5, P6_10_2_3, P6_10_2_5,
+                                          P6_10_3_3, P6_10_3_5, P6_10_4_3,
+                                          P6_10_4_5, P6_10_5_3, P6_10_5_5,
+                                          P6_10_6_3, P6_10_6_5, P6_10_7_3,
+                                          P6_10_7_5)
+
+#convertir datos para mayor facilidad
+#write.csv(TmodulMTHN2,'~\\Rproject2\\TmodulMTHN2.csv', row.names = FALSE)
+
+#TmodulMTHN2 <- read.csv("~/Rproject2/TmodulMTHN2.csv", header=TRUE, stringsAsFactors=FALSE)
+
+```
+
+
+```{r, include=FALSE, echo=FALSE}
+write.csv(TmodulMTHN2,'C:\\Users\\Memo\\Documents\\Rproject2\\TmodulMTHN2.csv', row.names = FALSE)
+
+TmodulMTHN2 <- read.csv("~/Rproject2/TmodulMTHN2.csv", header=TRUE, stringsAsFactors=FALSE)
+```
+
+```{r}
+TmodulMTHN2C<-merge(TmodulMTHN, TmodulMTHN2, by.x=c("CONTROL","VIV_SEL",
+                                                    "HOGAR","N_REN"),
+                    by.y=c("CONTROL","VIV_SEL","HOGAR","N_REN"))
+
+
+
+TmodulMTHN2C <- TmodulMTHN2C %>% replace(is.na(.), 0) %>%
+  mutate(MTPN5 =rowSums(.[5:68]))
+
+TmodulMTHN2C<-merge(TmodulMT, TmodulMTHN2C, by.x=c("CONTROL","VIV_SEL",
+                                                   "HOGAR","N_REN"),
+                    by.y=c("CONTROL","VIV_SEL","HOGAR","N_REN"))
+
+
+
+
+```
+
+
+```{r}
+#Horas totales para el mercado 
+
+sum(TmodulHTHN2C$HTP5)
+
+#Minutos totales para el mercado
+
+sum(TmodulMTHN2C$MTP5)
+```
+
+
+```{r}
+#Horas totales para producción de bienes para uso exclusivo del hogar
+
+sum(TmodulHTHN2C$HTP6H)
+
+#Minutos totales para producción de bienes para uso exclusivo del hogar
+sum(TmodulMTHN2C$MTP6H)
+```
+
+```{r}
+#Horas totales para trabajo no remunerado
+
+sum(TmodulHTHN2C$HTPN5)
+
+#Minutos totales para trabajo no remunerado
+sum(TmodulMTHN2C$MTPN5)
+```
+
+
+```{r, include=FALSE,echo=FALSE}
+#sum(TmodulMTHN2C$MTPN5)/60
+#No funciono
+#cols <- names(TmodulMTHN2C[,2:65])
+
+#TmodulMTHN2C[cols] <- lapply(TmodulMTHN2C[cols], numeric) 
+```
+
+
+```{r}
+#Obteniendo las columnas necesarias para responder la pregunta 20
+
+P201<-TmodulHTHN2C %>% dplyr::select(CONTROL,VIV_SEL,
+                                     HOGAR,N_REN,HTP5,HTP6H, HTPN5,may12yS)
+
+P202<-TmodulMTHN2C%>% dplyr::select(CONTROL,VIV_SEL,HOGAR,
+                                    N_REN,MTP5,MTP6H, MTPN5)
+
+P20<-merge(P201, P202, by.x=c("CONTROL","VIV_SEL",
+                              "HOGAR","N_REN"),
+           by.y=c("CONTROL","VIV_SEL","HOGAR","N_REN"))
+
+P20 <- P20 %>% replace(is.na(.), 0) %>% mutate(TotalHor =
+                                                 rowSums(.[5:7]))
+
+P20 <- P20 %>% replace(is.na(.), 0) %>% mutate(TotalMin =
+                                                 rowSums(.[9:11]))
+
+
+P20 %>% group_by(may12yS) %>% count(Suma_total_Horas =
+                                      sum(TotalHor), Suma_total_Min =
+                                      sum(TotalMin), Total_tiempo =
+                                      Suma_total_Horas +(Suma_total_Min/60))
+
+```
+
+
+## Pregunta 21
+
+**Tiempo total semanal de trabajo para el mercado, producción de bienes para uso exclusivo del hogar y trabajo no remunerado en los hogares por sexo y condición de habla o no habla de lengua indígena (personas de 12 o más años)**
+
+
+```{r}
+#Obteniendo las columnas necesarias para responder la pregunta 21
+
+P211<-TmodulHTHN2C %>% dplyr::select(CONTROL,VIV_SEL,HOGAR,
+                                     N_REN,HTP5,HTP6H, HTPN5,may12yS,P4_1)
+
+P212<-TmodulMTHN2C%>% dplyr::select(CONTROL,VIV_SEL,
+                                    HOGAR,N_REN,MTP5,MTP6H, MTPN5)
+
+P21<-merge(P211, P212, by.x=c("CONTROL","VIV_SEL",
+                              "HOGAR","N_REN"),
+           by.y=c("CONTROL","VIV_SEL","HOGAR","N_REN"))
+
+P21 <- P21 %>% replace(is.na(.), 0) %>% mutate(TotalHor =
+                                                 rowSums(.[5:7]))
+
+P21 <- P21 %>% replace(is.na(.), 0) %>% mutate(TotalMin =
+                                                 rowSums(.[10:12]))
+
+
+# Convertir a Factor si habla lengua indigena: 1:"Si" 2: "No"
+
+P21 <- P21 %>%mutate(Habla_LI = 
+                           ifelse(
+                             as.character(as.numeric(as.character(P21$P4_1)))==
+                               1, "Si", "No"))
+
+
+xplot<-P21 %>% group_by(may12yS, Habla_LI) %>% count(Suma_total_Horas =
+                                      sum(TotalHor), Suma_total_Min =
+                                      sum(TotalMin), Total_tiempo =
+                                      Suma_total_Horas +(Suma_total_Min/60))
+
+xplot
+
+```
+
+
+```{r}
+ggplot(xplot,
+       aes(Habla_LI, y = Total_tiempo, fill=Habla_LI)) + geom_bar(stat="identity") +
+  scale_y_continuous() +facet_grid(~may12yS)+theme_bw() + 
+  labs(title="Total tiempo", y="Horas")
+
+```
+
+
+
+
+
+
+# Estimar parámetros
+
+**Instrucciones:** seleccionen una muestra aleatoria simple de ¼ de la población y estimar
+
+
+> Estimar la media del tiempo total semanal de trabajo para el mercado, producción de bienes para uso exclusivo del hogar y trabajo no remunerado en los hogares por sexo y condición de habla o no habla de lengua indígena (personas de 12 o más años)
+
+### Parámetros de la Población
+
+```{r}
+
+#transformar minutos a horas
+P20$TotalMin<- P20$TotalMin/60
+
+P20 <- P20 %>% replace(is.na(.), 0) %>% mutate(Totaltiempo =
+                                                 rowSums(.[12:13]))
+#Tiempo total
+sum(P20$Totaltiempo)
+
+```
+
+
+### Parámetros de la muestra
+
+```{r}
+set.seed(4538)
+
+N <- length(P20$Totaltiempo) #tamaño de la población
+# muestra de un cuarto de la poblacion 
+n <- 10530
+#selecciono una m.a.s.
+m1 <- sample(1:N,n)  #id de unidades muestrales en muestra
+muestra <- P20[m1,] #esta es la muestra
+dim(muestra)
+
+Tiemp.prom <- mean(muestra$Totaltiempo)
+#varianza
+s2 <- var(muestra$Totaltiempo)
+var.Tiemp.prom <- (1-n/N)*s2/n
+#estimación de un total
+Tiemp.tot <- N*Tiemp.prom
+#varianza
+var.Tiemp.tot <- N^2*var.Tiemp.prom
+ee.Tiemp.tot <- sqrt(var.Tiemp.tot)
+prec <- 1.96*ee.Tiemp.tot
+li_Tiemp.tot <- Tiemp.tot- prec
+ls_Tiemp.tot <- Tiemp.tot+ prec
+
+Tiemp.tot;li_Tiemp.tot;ls_Tiemp.tot
+
+```
+
+
+Como el intervalo de confianza del parámetro obtenido en la muestra aleatoria contiene al valor poblacional, concluimos que es una muestra representativa de la población total.
