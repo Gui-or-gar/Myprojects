@@ -1,0 +1,315 @@
+---
+title: "Statistical inference with the GSS data"
+output: 
+  html_document: 
+    fig_height: 4
+    highlight: pygments
+    theme: spacelab
+    author: Guillermo Ortiz Garin
+---
+
+## Setup
+
+### Load packages
+
+```{r load-packages, message = FALSE}
+library(ggplot2)
+library(dplyr)
+library(statsr)
+library(car)
+library(readxl)
+```
+
+### Load data
+
+
+```{r load-data}
+load("gss.Rdata")
+```
+
+
+
+
+## Part 1: Data
+
+
+The general social survey is an organism that gets data from American society in order to monitor and explain trends and constants in attitudes, behaviors, and attributes. According to their webpage hundreds of trends have been tracked since 1972, so we can obtain a lot of information in understanding the changes in American behavior. They do this surveys to understand the American society but also to compare with other countries. 
+The sample which we will use in this project was carried until 2012, so we can understand some trends in that times and given that information try to predict how the trends behave in the next years. on their webpage they say that fewer than 5,200 Americans are eligible and invited to respond to this survey, it seems that they use a stratified sample because they randomly chose householder from different countries and randomly select one adult form that house. It seems that we can make inferences on this data, but probably we cannot say that we can trace causal relationships, because there are no experimental manipulations (e.g. they are interviewed at the same hour, on the same day, same place and so on) for that reason we need to be careful about the conclusions of the data and possibles sources of bias in the answers.
+
+## Part 2: Research question
+I'm interested in total family income in constant dollars variable (coninc) and opinion of how people get ahead (get ahead), nevertheless, the income variable probably is affected by a various factor (that could explain its strong skewness). Before I begin, I chose a sample from specific range of years and a specific range of income that was chosen based on the "average income in the USA by family and household" [webpage](https://www.thebalance.com/what-is-average-income-in-usa-family-household-history-3306189). I chose that range because apparently, the average income oscillates between roughly 53000 and 57000 from 2008 to 2012. Then informally speaking: I chose a value that roughly is the average of that years, as a maximum value and then I'll take a sample of 2000 observations. The first reason is that I want to avoid the skewness of the income variable.  The other reason is because I'm interested in the answers from people (in not statistically terms) below the average income and because in those years there is not much change in the family income I think is a good way to make inference when the average income doesn't change in the next years and how is the mode of thinking (get ahead). Once clarifying this, my research questions are:
+
+Is there at least one difference in the income of people that have an opinion on how the people get ahead?
+
+Where are the differences in the mode of thinking?
+
+We can use another method of inference in order to understand the difference between groups?
+
+
+## Part 3: Exploratory data analysis
+
+
+##### headache trying to filter the data
+
+I created this subsection because I found some problem with the data, It seems that there is an error when you try to delete certain levels, for example, base on the data I want, I filter regarding my criteria and the print a table of my group variable.
+
+```{r}
+gss3 <- gss %>% filter(coninc >= 0, coninc  <= 57000, year >= 2008)
+
+gss3 <- gss3 %>% filter(!is.na (year))
+
+gss3 <- gss3 %>% filter(!is.na (coninc))
+
+gss3 <- gss3 %>% filter(!is.na (getahead))
+```
+
+I already filtered the data that I want to use and now I only obtain a random sample in order to draw inferential conclusions.
+
+```{r}
+#I use this seed in order that you can eplicate the same results of my saple
+set.seed(91020)
+```
+
+
+```{r}
+n <- 2000
+gss3 <- sample_n(gss3, n)
+```
+
+Number of observations in each group:
+```{r}
+table(gss3$getahead)
+```
+
+As you can see, even that the "other" level hasn't observations, this still appears there. I try to filter again but nothing happens:
+
+```{r}
+gss3 <- gss3 %>% filter(getahead != "other")
+table(gss3$getahead)
+```
+
+I also tried with other methods as filtering by the number of observations. Nevertheless, again nothing happens:
+
+```{r, message=FALSE, warning=FALSE, prompt=FALSE, results='hide'}
+gss3 <- gss3 %>%group_by(getahead) %>% filter(n() >= 0)
+```
+
+```{r}
+table(gss3$getahead)
+```
+
+It seems that there is a problem in the data frame because this happens also in other variables:
+
+```{r, message=FALSE, warning=FALSE, prompt=FALSE, results='hide'}
+gss3 %>%group_by(incom16) %>% filter(n() >= 0)
+```
+
+```{r}
+table(gss3$incom16)
+```
+
+I broke my head thinking in a solution and I couldn't find it, I also tried downloading the data from coursera again, and the problem continues.
+
+I have had to opt for a new alternative, because that give me troubles in the last section. I converted "gss3"" sample to an excel file and just change the name. if you have a different solution to this, I'll appreciate your feedback.
+
+Now, I'll download my new file
+
+```{r, warning=FALSE, message=FALSE}
+MySample <- read_excel("MySample.xlsx")
+```
+
+Just to be sure that is the same number of observations previuosly choosed
+
+```{r}
+#transform our independent variable as factor
+MySample$getahead <- factor(MySample$getahead)
+table(MySample$getahead)
+```
+
+It seems that just accommodates the observations in a different order but are the same number of observations.
+
+Finally, I only delete the remaining "others" groups from the "getahead"" variable
+```{r, warning=FALSE}
+MySample <- MySample %>% filter(getahead == c("Both Equally", "Hard Work", "Luck Or Help"))
+```
+
+
+
+##### coninue...
+
+Now I know which groups are available in the explanatory variable from the obtained sample, we can set or hypothesis as:
+
+\[{H}_0={\mu}_{hardwb} = {\mu}_{equallg} = {\mu}_{lookh}\]
+
+All means are equal between groups
+
+\[{H}_1={\mu}_{hardwb} {\neq} {\mu}_{equallg}{\neq} {\mu}_{lookh}\]
+
+At least one mean is different.
+
+Where the ${\mu}'s$ are the family income in the years from 2009 to 2012 and from people above the average of those years.
+
+So first I want to check with a barplot the relation with the dependent variable.
+
+```{r}
+ggplot(data = MySample, aes(x = getahead, y = coninc)) + geom_bar(stat = "identity")
+```
+
+Apparently, the difference between HardWork and the other variables is pretty strong but is probably due to the differences in the number of observations.
+
+we start by looking at general statistics regarding the dependent variable. 
+```{r}
+MySample %>%group_by(getahead) %>% summarise(coninmean = mean(coninc), coninmedian = median(coninc), coninsd = sd(coninc), coninmin = min(coninc), coninmax = max(coninc))
+
+```
+
+we can see that between "Both Equally" and "Hard Work" have similar means, but different SD's; the "Luck Or Help" group has the lower mean and lower SD. We need to remember that the "Hard Work" level has many more observations than the others, anyway, we'll evaluate if the homoscedasticity criteria hold later.
+
+We make a boxplot of the variables to see more clear this:
+
+```{r}
+ggplot(data = MySample, aes(x = getahead, y = coninc)) + geom_boxplot()
+```
+
+Just by looking at the plot it seems that the data is very scattered around the mean, but the homoscedasticity criteria will hold because the boxes are not so separated to each other. 
+
+We can also look at their respective distribution, to asses normality:
+
+```{r}
+ggplot(data = MySample,aes(x=coninc))+geom_histogram(bins = 10)+facet_grid(~getahead)+theme_bw()
+```
+
+It's difficult to asses some normality in the distribution because it seems that the data are very spread and have some peaks that could indicate a multimodal distribution, but because the number of observations is higher than 30 in each group, we can assume that the central limit theorem holds well. 
+
+## Part 4: Inference
+
+First, we need to decide which statistic we can use. Because our explanatory variable has more than two levels, we need to use a method related to that, and because our response variable is continuous (income) we opt for an ANOVA test. Thus we need to check if the condition is met:
+
+1.- the observations are independent of each other.
+
+2.- Normal distribution: the distribution is more amodal in my opinion, but because the size is more than 30 per group, we believe that the central limit theorem holds well.
+
+3.- equal variance: we see previously with the summary statistics that the variances are not so different, but a better method to asses this is with a Levene test:
+
+.If we found a significant p-value then the variances are different and the homoscedasticity criteria do not hold and therefore we cannot use ANOVA.
+```{r}
+leveneTest(coninc~ getahead, data = MySample, center = mean)
+```
+
+The Leven test says that the homoscedasticity criteria hold, so, apparently, the differences in the number of observations don't affect much the groups. We can continue with our ANOVA analysis then:
+
+We use the aov function and store our model in a new variable:
+
+```{r}
+Anov_gethead <- aov(MySample$coninc ~ MySample$getahead)
+
+```
+
+Now, we call to the summary of the model:
+
+```{r}
+summary(Anov_gethead)
+```
+
+The ANOVA told us that at least one of the means is different in the groups of "get ahead" variable in relation to the family income. So we fail to reject the null hypothesis
+\[{H}_0={\mu}_{hardwb} = {\mu}_{equallg} = {\mu}_{lookh}\]
+
+and we accept the alternative hypothesis
+
+\[{H}_1={\mu}_{hardwb} {\neq} {\mu}_{equallg}{\neq} {\mu}_{lookh}\]
+
+But in which of the groups are the differences?
+
+Our corrected p-value will tell us where are these differences. Because "Bonferroni" was the method taught in class, we use the function the pairwise t.test to see our corrected p-value: 
+```{r}
+pairwise.t.test(MySample$coninc,MySample$getahead, p.adjust.method = "bonf", alternative = "two.sided")
+```
+
+The Bonferroni test, tell us that the differences are between "Luck or Help" and "Hard Work" groups. 
+
+We also can use another criterion as Tukey adjust method. There is a good command to obtain the result just calling our ANOVA model.
+
+```{r}
+TukeyHSD(Anov_gethead)
+```
+
+That give us roughly the same values as Bonferroni correction, the two model tell us that the significant difference between the groups I described earlier.
+
+
+We can understand what happened between the groups that weren't significant, for that reason I'll try to use a simulation method to have a better understanding of the true differences of those two groups.
+
+I'll create two bootstrapping simulations, the first between "Hard work" and "Both Equally" and the second between "Luck or help" and "Both equally"
+
+#####Frist simulation
+First, I'll filter the data again to only use two levels. For that reason I'll drop the "Luck or help" group for this simulation.
+
+```{r}
+SimulB <- MySample %>% filter(getahead != "Luck Or Help")
+
+SimulB %>%group_by(getahead) %>% summarise(coninmean = mean(coninc), coninmedian = median(coninc), coninsd = sd(coninc), coninmin = min(coninc), coninmax = max(coninc))
+
+```
+
+if we repeat and plot their distributions:
+```{r}
+ggplot(data = SimulB,aes(x=coninc))+geom_histogram(bins = 10)+facet_grid(~getahead)+theme_bw()
+```
+
+
+We will need to reconsider if the mean is the best estimate for this values, but, because the ANOVA is based on the means, I'll use also in the bootstrapping analysis. 
+
+*Note: the problem of use the "gss" database was that when tried to use inference function, an error message appears: `Error: Categorical variable has more than 2 levels, confidence interval is undefined, use ANOVA to test for a difference between means` this is due to the level with 0 observations, but that doesn't happen in my excel data, that was the main reason of why I made that.*
+
+Now we can use in our bootstraping model to stimate the confidence intervals of this differences. I'll use a 95% CI and the SE method:
+
+```{r, echo=FALSE}
+SimulB <- read_excel("SimulB.xlsx")
+```
+
+
+```{r}
+inference(y=coninc, x= getahead, data = SimulB, type = "ci",statistic = "mean",method = "simulation", conf_level = .95,sig_level = 0.05, nsim = 15000, boot_method = "se" )
+```
+
+*Note: I noticed that the CI change a little always that I knit my work*
+
+Now, based on a bootstrapping simulation, we are 95% confident that the true differences between "Both Equally" and "Luck or Help" groups, are between -4916.6421 and 1739.3849 and because "0" is a possible value, we expect that if we found a sample with significant differences, could be due to chance.
+
+
+####second simulation
+
+```{r}
+
+SimulB2 <- MySample %>% filter(getahead != "Hard Work")
+
+SimulB2 %>%group_by(getahead) %>% summarise(coninmean = mean(coninc), coninmedian = median(coninc), coninsd = sd(coninc), coninmin = min(coninc), coninmax = max(coninc))
+
+```
+
+exploring the distributions:
+```{r}
+ggplot(data = SimulB2,aes(x=coninc))+geom_histogram(bins = 10)+facet_grid(~getahead)+theme_bw()
+```
+
+Again we need to reconsider if the means are the best parameters, but, again based on the ANOVA we need to use them.
+
+
+```{r, echo=FALSE}
+SimulB2 <- read_excel("SimulB2.xlsx")
+```
+
+
+```{r}
+
+inference(y=coninc, x= getahead, data = SimulB2, type = "ci",statistic = "mean",method = "simulation", conf_level = .95,sig_level = 0.05, nsim = 15000, boot_method = "se" )
+```
+
+*Note: I noticed that the CI change a little always that I knit my work*
+
+Based on a simulation we are 95% confident that the true difference is between 
+-609.638 and 8766.2394 and because "0" is a possible value, we expect that if we found a sample with significant differences, could be due to chance.
+
+#Discussion
+
+We choose a random criterion based on the averages from income families of certain years in order to deal with the strong skewness of the variable, also because their averages haven't many differences between years according to some internet sources, but that criterion could be very error-prone, for that reason the shortcomings need to be considered.
+.
