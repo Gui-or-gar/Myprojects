@@ -1,0 +1,577 @@
+---
+title: "Tarea examen muestreo"
+author: 
+  - "Victor Garcia Canul"
+  - "Armando Luis Tapia"
+  - "Guillermo Ulises Ortiz Garin"
+  - "Jorge Arturo Rodríguez Horcasitas"
+date: "24/12/2020"
+logo:  "iimas.jng"
+output: 
+  html_document:
+    df_print: paged
+    highlight: tango
+    theme: flatly
+  pdf_document: default
+  word_document: default
+  
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(lemon)
+knit_print.data.frame <- lemon_print
+```
+
+
+$![](C:/Users/Memo/Documents/Rproject2/SubGit/Myprojects/Datos_covid_muestreo_projecto/imagenes/iimas.jpg)$
+
+# {.tabset .tabset-fade .tabset-pills}
+
+## Tarea
+
+```{r, message=FALSE, warning=FALSE, include=FALSE}
+library(tidyverse)
+library(dplyr)
+library(tidyr)
+library(kableExtra)
+library(VIM)
+library(visdat)
+library(mice)
+```
+
+Con la información de la base de datos “covid_oct”, que contiene información de enfermos de covid desde el mes de octubre hasta el 8 de noviembre de 2020, y con la información de las variables que están en los archivos “Catalogos_0412.xlsx” y “Descriptores_0419.xlsx” y, además,  considerando que esa es la población completa, conteste lo siguiente:
+
+  * 1.	Seleccione una muestra piloto de tamaño 300 con m.a.s. y calcule el tamaño de muestra necesario para estimar la proporción de personas fallecidas con una precisión de 0.07 y una confianza del 95%.
+
+
+  * 2.	Seleccione una muestra del tamaño calculado en el punto 1 con m.a.s. y estime:
+      + a.	la proporción de personas fallecidas y su intervalo de confianza
+    
+      + b.	las proporciones de personas con covid en cada uno de las entidades
+    
+      + c.	la proporción de personas enfermas con comorbilidades (diabetes, epoc, asma, inmusupr,            hipertensión, otra, cardiovascular, renal y tabaquismo
+    
+      + d.	proporción de personas enfermas que requirieron ingresar a Cuidados Intensivos
+    
+       + e.	proporción de mujeres y de hombres
+    
+      + f.	media de edad
+    
+      + g.	proporción de pacientes ambulatorios y hospitalizados (variable Tipo_paciente)
+
+  * 3.	 En forma muestral, calcule la proporción de no respuesta en cada una de las variables utilizadas en el punto 2.
+  
+  * 4.	Dominios. En mujeres: 
+    + (a)	estime la proporción de mujeres embarazadas
+    + (b)	estime la proporción de enfermas intubadas
+    + (c)	promedio de edad
+    + (d)	proporción de enfermas con diabetes
+    
+  * 5.	En hombres:
+    + a.	Proporción de enfermos intubados
+    + b.	Promedio de edad
+    + c.	Proporción de enfermos con diabetes
+
+
+Haga un reporte con todos los resultados y su interpretación.
+
+
+
+## Análisis exploratorio
+
+Primero carguemos la base de datos y hagamos un análisis exploratorio de los datos.  
+```{r}
+#le modifiqué para que de una vez los leyera como caracter y no como fecha
+covid_oct <- read_csv("~/Rproject2/Muestreo2021/covid_oct.csv", 
+    col_types = cols(FECHA_INGRESO = col_character(), 
+        FECHA_SINTOMAS = col_character(), 
+        FECHA_DEF = col_character(),
+        FECHA_ACTUALIZACION= col_character()))
+head(covid_oct)
+dim(covid_oct)
+```
+
+Podemos ver que es una base de datos con 486576 registros y 38 variables revisemos los nombres de estas variables:
+```{r}
+names(covid_oct)
+```
+
+Ahora analizaremos la base separandola en una que contenga las variables categóricas y otra que contenga las variables numéricas.
+
+```{r}
+classes <- sapply(covid_oct, function(x) class(x))
+categoricos <-  covid_oct[,which(classes %in% c("factor","character"))]
+numericos <- covid_oct[,-which(classes %in% c("factor","character"))]
+names(categoricos)
+names(numericos)
+```
+
+Realicemos ahora una función para calcular estadísticos descriptivos para cada base de datos que hemos obtenido, la base categórica y la numérica.
+
+```{r}
+moda <- function(x){
+  if (class(x)%in%c("character","factor")) {
+    table(x) %>% which.max() %>% names()
+  }
+  else {
+    table(round(x,2)) %>% which.max() %>% names()
+  }
+}
+```
+
+
+
+```{r}
+perfil <- function(frame,n,type="categoricos") {
+  
+  uniques <- data.frame(uniques = sapply(frame,function(x) unique(x) %>% length()))
+  
+  moda <- data.frame(mod=sapply(frame,function(x) moda(x)))
+  
+  if(type=="numericos"){
+    
+    min <- data.frame(min=sapply(frame,function(x) min(x)))
+    
+    max <- data.frame(max=sapply(frame, function(x) max(x)))
+    
+    media <- data.frame(media=sapply(frame, function(x) mean(x)))
+    
+    mediana <- data.frame(mediana=sapply(frame,function(x) median(x)))
+    
+    quant1 <- data.frame(quant1=sapply(frame, function(x) quantile(x)[2]))
+    
+    quant3 <- data.frame(quant3=sapply(frame, function(x) quantile(x)[4]))
+    
+    desviacion <- data.frame(desviacion=sapply(frame, function(x) sd(x)))
+    
+    perfil_a <- cbind(moda,min,max,media,mediana,quant1,quant3,desviacion)
+    
+    perfil_a
+    
+  }
+  else{
+    perfil_a <- cbind(uniques,moda)
+    
+    perfil_a
+  }
+}
+```
+
+Ya que tenemos la función revisemos lo que nos arroja para los datos categoricos.
+
+```{r}
+perfil_categoricos <- perfil(categoricos,n)
+perfil_categoricos
+```
+podemos observar que la moda de la variable "país de nacionalidad" es México lo cual es de esperarse ya que la base pertenece a México pero eso no implica que todos los pacientes sean de nacionalidad mexicana. Otra cosa que observamos es que el valor que más se repite en la variable "País de origen" es el número 97 que de acuerdo a los descriptores significa qie se contestó como "no aplica" otra cosa que llama la atención son los valores rellenados con 9 en la "fecha de defunción" nos indica que la persona no ha fallecido, sería bueno crear una variable indicativa para decur sin el paciente está vivo o no.
+
+
+```{r}
+perfil_numericos <- perfil(numericos,n,type = "numericos")
+perfil_numericos
+```
+
+En esta tabla observamos estadísticos descriptivos, la moda, el valor mínimo, el máximo, la media, la mediana, el primer cuantil, el tercer cuantil y la desviación estándar.
+Se percibe algo interesante en cuanto a la edad de los pacientes, la moda está en 28 años, sin embargo, la media está en 40 años, al analizar los demás indicadores vemos que el valor mínimo es cero y el máximo es 120, recordemos que la media es sensible a valores atípicos, es por esto que es mejor que es preferible confiar en el valor arrojado por la media.
+Otro dato que llama la atención es la moda de la variable "Sexo", el valor predominante es "1" que de acuerdo al catálogo provisto son las mujeres las que predominan en esta base de datos.
+A continuación se presenta la gráfica de la variable "Resultados de Laboratorio"  en la cual se presentan la cantidad de datos desagregados de la siguiemte manera:
+
+ **CLAVE** |  **DESCRIPCION** | 
+----------------------| ----------------------|
+1|POSITIVO A SARS-COV-2|
+2|NO POSITIVO A SARS-COV-2|
+3|RESULTADO PENDIENTE|
+4|RESULTADO NO ADECUADO|
+97|NO APLICA (CASO SIN MUESTRA)|
+
+```{r}
+ggplot(covid_oct,aes(x=as.factor(RESULTADO_LAB),fill=factor(RESULTADO_LAB)))+
+  geom_bar(stat = "count",alpha=.7)+
+  labs(x="Resultado de Laboratorio")+
+  theme_bw()
+```
+
+con base en la gráfica podemos observar que la existen una mayor cantidad de casos que resultaron no positivos a SARS-VOC-2, en segundo lugar se muestra una gran proporción de casos que se catalogaron como Positivos a SARS-COV-2.
+
+**DATOS MISSING**
+
+Ahora que sabemos que aquellos que valores que son "99" o "999" son valores no especificados, es decir, son valores que fueron no reportados o por algún otro motivo se perdió esa información. Procederemos a catalogarlos como "NA" en la base que cargamos en R.
+
+```{r}
+covid_oct[covid_oct=="99"|covid_oct=="999"] <- NA
+summary(aggr(covid_oct,plot = F))
+```
+como podemos ver la variable con mayor cantidad de datos nulos es "MIGRANTE" en la cual se cuestiona si es migrante el encuestado, otra variable con muchos valores missing son aquellas en las que se pregunta si el encuestado habla alguna lengua indígena o si es indígena pareciera que al cuestionar el orgien de las personas se pierden valores o simplemente deciden no contestar. A continuación se presenta un gráfico de los valores faltantes en su proporción y se calcula el porcentaje total de valores faltantes.
+
+```{r fig.height=12, fig.width=15}
+aggr(covid_oct,numbers=TRUE,prop=c(TRUE,FALSE),cex.axis=.5)
+
+100*length(which(is.na(covid_oct)))/(length(covid_oct$ID_REGISTRO)*ncol(covid_oct))
+```
+el porcentaje total de valores perdidos con respecto a la cantidad de datos totales, es decir, el número de celdas con valores faltantes que pertencecen al dataframe es 2.9%. Este número es muy pequeño como para considerar los datos faltantes un problema.
+
+Ahora trabajaremos con este dataframe en R.
+```{r fig.height=5, fig.width=5}
+layout(matrix(c(1:4),2))
+ggplot(covid_oct,aes(x=as.factor(DIABETES),fill=factor(DIABETES)))+geom_bar(stat = "count",alpha=.7)+labs(x="DIABETES")+theme_classic()
+ggplot(covid_oct,aes(x=as.factor(CARDIOVASCULAR),fill=factor(CARDIOVASCULAR)))+geom_bar(stat = "count",alpha=.7)+labs(x="CARDIOVASCULAR")+theme_classic()
+ggplot(covid_oct,aes(x=as.factor(RENAL_CRONICA),fill=factor(RENAL_CRONICA)))+geom_bar(stat = "count",alpha=.7)+labs(x="PROBLEMA RENAL")+theme_classic()
+ggplot(covid_oct,aes(x=as.factor(HIPERTENSION),fill=factor(HIPERTENSION)))+geom_bar(stat="count",alpha=.7)+labs(x="HIPERTENSION")+theme_classic()
+
+```
+
+
+Con base en los graficos podemos ver que hay mayor cantidad de pacientes hipertensos y diabeticos, sin embargo, son menos a compatacion de los que no presentan estas enfermedades.
+
+
+## Pregunta1
+* 1.	Seleccione una muestra piloto de tamaño 300 con m.a.s. y calcule el tamaño de muestra necesario para estimar la proporción de personas fallecidas con una precisión de 0.07 y una confianza del 95%.
+
+En primer lugar calculamos la muestra piloto de tamaño 300 con m.a.s.
+
+```{r}
+covid_oct <- covid_oct %>% mutate(DIABS=ifelse(DIABETES==1,1,0))
+covid_oct <- covid_oct %>% mutate(DIFUN=ifelse(FECHA_DEF!="9999-99-99",1,0))
+covid_oct <- covid_oct %>% mutate(covid=ifelse(covid_oct$CLASIFICACION_FINAL==1|covid_oct$CLASIFICACION_FINAL==2|covid_oct$CLASIFICACION_FINAL==3,1,0))
+N <- length(covid_oct$ID_REGISTRO)
+np <- 300
+set.seed(252)
+num1 <- sample(1:N,np)
+mpilot <- covid_oct[num1,]
+dim(mpilot)
+head(mpilot)
+```
+
+
+recordemos la fórmula para calcular el tamaño de muestra considerando que estamos trabajando con la poblacón.
+
+$n_0= \frac{Z_{1-\alpha/2}^2*P*(1-P)}{\delta^2}$
+
+Ahora calculemos el tamaño de muestra
+```{r}
+ppilot <- .5
+n0 <- 1.96^2*ppilot*(1-ppilot)/.07^2
+n <- n0/(1+n0/N)
+c(n,n0)
+```
+Por lo tanto el tamaño de muestra que necesitamos es de: **196 personas**
+
+## Pregunta2
+
+ * 2.	Seleccione una muestra del tamaño calculado en el punto 1 con m.a.s. y estime:
+
+Primero seleccionempos la muestra de tamaño 68 por muestreo aleatorio simple.
+```{r}
+n <- ceiling(n)
+set.seed(252)
+ind <- sample(1:N,n)
+muestra <- covid_oct[ind,]
+
+```
+
+   + a.	la proporción de personas fallecidas y su intervalo de confianza
+   
+```{r}
+p.est <- mean(muestra$DIFUN)
+var.p.est <- (1-n/N)*p.est*(1-p.est)/(n-1)
+ee.est <- sqrt(var.p.est)
+prec <- 1.96*ee.est  
+li.pest <- p.est-prec
+ls.pest <- p.est+prec
+p.est; li.pest; ls.pest
+``` 
+    
+   + b.	las proporciones de personas con covid en cada uno de las entidades
+
+Es posible que el archivo excel de los descriptores no esté actualizado ya que las variables `INDIGENA`, `TOMA_MUESTRA` y `CLASIFICACION_FINAL` no aparecen descritas. 
+
+Sin embargo haciendo una busqueda en internet encontramos que:
+
+* TOMA_MUESTRA: Identifica si al paciente se le tomó una muestra para hacer una prueba de laboratorio para la detección de la enfermedad COVID-19.
+* INDÍGENA: Identifica si el paciente se autoidentifica como una persona indígena. 
+* CLASIFICACION_FINAL: Identifica si el paciente es un caso de COVID-19. La clasificación se divide de la siguiente manera: 
+
+1.- Caso de COVID-19 confirmado por asociación clínica epidemiológica
+
+2.- Caso de COVID-19 confirmado por comité de dictaminación
+
+3.- Caso de SARS-CoV-2 confirmado por laboratorio
+
+4. -Inválido por laboratorio
+
+5.- No realizado por laboratorio
+
+6.- Caso sospechoso
+
+7.- Negativo a SARS-CoV-2 por laboratorio
+
+fuente: [base de datos actualizada](https://serendipia.digital/2020/10/salud-actualiza-base-de-datos-de-covid-19/)
+
+Por lo tanto se realizará dos análisis: con las variables `RESULTADO_LAB` y `CLASIFICACION_FINAL`   
+
+  + b.1.	la variable `RESULTADO_LAB`
+   
+   
+```{r}
+#Cambiar los códigos por las nombres abreviados
+namcde<-data.frame(ENTIDAD_RES=c(01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23,	24,25,26,27,28,29,30,31,32,36,97,98,99),
+                   nm = c("AS", "BC",	"BS",	"CC",	"CL",	"CM",	"CS",	"CH",	"DF",	"DG",	"GT",	'GR',	'HG',	'JC',	'MC',	"MN",	"MS",	"NT",	'NL',	"OC",	"PL",	'QT',	"QR",	'SP',	'SL',	'SR',	"TC",	'TS',	"TL",	"VZ",	'YN',	"ZS",	"EUM",	NA,	"SI",	"NE"))
+
+muestra<-merge(muestra,namcde, by.x="ENTIDAD_RES",by.y="ENTIDAD_RES")
+
+
+#Filrar los resultados que salieron Positivo a SARS-CoV-2
+muestrab<-muestra%>%filter(RESULTADO_LAB==1)
+
+muestrab%>%group_by(nm)%>%summarise(propxenti=n()/length(muestrab$FECHA_ACTUALIZACION))
+
+x <- barplot(table(muestrab$nm)/length(muestrab$nm),xaxt="n",col="lightblue")
+labs <- paste(names(table(muestrab$nm)))
+text(cex=.7, x=x-.25, y=-0.005, labs, xpd=TRUE, srt=90)
+```
+
+
++ b.2. con  la variable `CLASIFICACION_FINAL` 
+
+
+Se filtraron los resultados que salieron Positivo a SARS-CoV-2 pero en la variable `CLASIFICACION_FINAL` tomando en cuenta solo los que tengan valor 1,2 o 3 según lo descrito arriba
+```{r}
+
+muestrae<-muestra%>%filter(CLASIFICACION_FINAL== 1 | CLASIFICACION_FINAL==2 | CLASIFICACION_FINAL== 3)
+
+muestrae%>%group_by(nm)%>%summarise(propxenti=n()/length(muestrae$FECHA_ACTUALIZACION))
+
+x <- barplot(table(muestrae$nm)/length(muestrae$nm),xaxt="n",col="lightblue")
+labs <- paste(names(table(muestrae$nm)))
+text(cex=.7, x=x-.25, y=-0.005, labs, xpd=TRUE, srt=90)
+```
+
+Podemos observar que se obtiene el mimso número de observaciones al hacerlo con los dos críterios por lo cual continuaremos con solo uno de ellos.
+
+```{r}
+length(muestrab)
+length(muestrae)
+```
+
+  
+  + c.	la proporción de personas enfermas con comorbilidades (diabetes, epoc, asma, inmusupr,            hipertensión, otra, cardiovascular, renal y tabaquismo
+
+Por personas "enfermas" entenderemos a aquellas a las que saperamos en la pregunta anterior, es decir, basado en los críterios, aquellas que dieron positivo a la enfermedad
+  
+ + c.1	Con la variable `RESULTADO_LAB`
+```{r, fig.width =12 , fig.height= 6}
+mycol<-which( colnames(muestrab)=="DIABETES" ):which( colnames(muestrab)=="TABAQUISMO" )
+
+par(mfrow=c(2,5))
+for (i in mycol) {
+  muestrab[,i]<-as.factor(as.character(muestrab[,i]))
+   print(any(levels(muestrab[,i])=="2") & length(levels(muestrab[,i]))==2)
+  if (any(levels(muestrab[,i])=="1") & any(levels(muestrab[,i])=="2") &length(levels(muestrab[,i]))==2 ) {
+    levels(muestrab[,i])<-c("Si","No")
+  }
+  else if (any(levels(muestrab[,i])=="2") &length(levels(muestrab[,i]))==3){
+    levels(muestrab[,i])<-c("No","Si","Se ignora")
+  }
+  else {
+    levels(muestrab[,i])<-c("No","Se ignora")
+  }
+  barplot(table(muestrab[,i])/length(muestrab[,i]),col="lightblue", main =names(muestrab[i]))
+  }
+
+
+
+
+
+myval<-data.frame(comorbilidad="x",proporcion=1)
+for ( i in mycol) {
+  xv<-muestrab%>%filter(muestrab[,i]=="Si")%>%summarise(p=n()/length(muestrab$ID_REGISTRO))
+  colnames(xv)<-paste(names(muestrab[i]),"prop")
+  newv<-c(colnames(xv)<-paste(names(muestrab[i]),"pm"),xv[,1])
+  myval<-rbind(myval,newv)
+  
+}
+
+ myval<-myval[-c(1),]
+
+
+
+
+```
+  
+  
+```{r caption="Proporción de morbilidades`.",render=lemon_print}
+myval
+```
+  
+  
+
+  
++ d.	proporción de personas enfermas que requirieron ingresar a Cuidados Intensivos
+```{r}
+muestrab <- muestrab %>% mutate(CI=ifelse(UCI==1,1,0))
+p.est.UCI <- mean(muestrab$CI)
+p.est.UCI
+
+muestrab[,"UCI"]<- as.factor(as.character(muestrab[,"UCI"]))
+
+muestrab[,"UCI"]<-fct_recode(muestrab$UCI, Si="1",No="2", No_aplic="97")
+
+barplot(prop.table(table(muestrab$UCI)))
+```
+
+    
++ e.	proporción de mujeres y de hombres
+
+En la muestra total:
+```{r}
+muestra <- muestra %>% mutate(h=ifelse(SEXO==2,1,0),m=ifelse(SEXO==1,1,0))
+p.est.hombres <- mean(muestra$h)
+p.est.mujer <- mean(muestra$m)
+p.est.hombres;p.est.mujer
+
+muestra[,"SEXO"]<- as.factor(as.character(muestra[,"SEXO"]))
+
+muestra[,"SEXO"]<-fct_recode(muestra$SEXO, M="1", H="2")
+
+barplot(prop.table(table(muestra$SEXO)))
+
+```
+
+Con la muestra de personas que salieron positivo a la enfermedad:
+
+```{r}
+muestrab <- muestrab %>% mutate(h=ifelse(SEXO==2,1,0),m=ifelse(SEXO==1,1,0))
+p.est.hombres <- mean(muestrab$h)
+p.est.mujer <- mean(muestrab$m)
+p.est.hombres;p.est.mujer
+
+muestrab[,"SEXO"]<- as.factor(as.character(muestrab[,"SEXO"]))
+
+muestrab[,"SEXO"]<-fct_recode(muestrab$SEXO, M="1", H="2")
+
+barplot(prop.table(table(muestrab$SEXO)))
+
+```
+
++ f.	media de edad
+
+Con toda la muestra:
+```{r}
+p.est.edad <- mean(muestra$EDAD)
+p.est.edad
+```
+    
+Con a muestra de personas que salieron psoitivas a la enfermedad:    
+    
+```{r}
+p.est.edad <- mean(muestrab$EDAD)
+p.est.edad
+```
+    
+    
++ g.	proporción de pacientes ambulatorios y hospitalizados (variable Tipo_paciente)
+
+
+Con la muestra completa:
+```{r}
+muestra <- muestra %>% mutate(AMB=ifelse(TIPO_PACIENTE==1,1,0),HOSP=ifelse(TIPO_PACIENTE==2,1,0))
+p.est.ambulatorio <- mean(muestra$AMB)
+p.est.hospi <- mean(muestra$HOSP)
+p.est.ambulatorio; p.est.hospi
+
+muestra[,"TIPO_PACIENTE"]<- as.factor(as.character(muestra[,"TIPO_PACIENTE"]))
+
+muestra[,"TIPO_PACIENTE"]<-fct_recode(muestra$TIPO_PACIENTE, AMB="1", HOSP="2")
+
+barplot(prop.table(table(muestra$TIPO_PACIENTE)))
+
+```
+Con a muestra de personas que salieron psoitivas a la enfermedad:  
+
+```{r}
+muestrab <- muestrab %>% mutate(AMB=ifelse(TIPO_PACIENTE==1,1,0),HOSP=ifelse(TIPO_PACIENTE==2,1,0))
+p.est.ambulatorio <- mean(muestrab$AMB)
+p.est.hospi <- mean(muestrab$HOSP)
+p.est.ambulatorio; p.est.hospi
+
+muestrab[,"TIPO_PACIENTE"]<- as.factor(as.character(muestrab[,"TIPO_PACIENTE"]))
+
+muestrab[,"TIPO_PACIENTE"]<-fct_recode(muestrab$TIPO_PACIENTE, AMB="1", HOSP="2")
+
+barplot(prop.table(table(muestrab$TIPO_PACIENTE)))
+```
+
+
+## Pregunta 3
+
++ 3.En forma muestral, calcule la proporción de no respuesta en cada una de las variables utilizadas en el punto 2
+
+Para el caso de las personas fallecidas observamos que no hay casos de no respuesta que se puedan identificar en esta base de datos ya que para identificar a los fallecidos creamos una variable indicadora con base en la variable fecha ya que si es alguna fecha distinta a "9999-99-99" sabemos que falleció. Además, podemos ver si hay algo ditinto a este valor mencionado que nos indique que es un valor faltante.
+```{r}
+ levels(muestra$FECHA_DEF)
+```
+sin embargo, no se muestra nada fuera de lo común.
+
+
+Para la proporción de datos faltantes de pacientes con covid revisemos primero que tipo de valores tenemos en la variable "CLASIFICACION FINAL" 
+```{r}
+table(muestra$CLASIFICACION_FINAL)
+```
+ como podemos ver tenemos valores de 3, 5, 6 y 7 los cuales todos nos indican que tienen un significado, ninguno de ellos se refiere a valores faltantes. Por lo tanto, no tiene caso calcular la proporción de una característica inexistente. 
+
+ + c.	la proporción de personas enfermas con comorbilidades (diabetes, epoc, asma, inmusupr,            hipertensión, otra, cardiovascular, renal y tabaquismo)
+ 
+ Primero consideramos el caso en el que lo observado vale 98 que significa que se ignora, consideraremos este como un dato faltante ya que el paciente puede no saber si tiene la morbilidad o no pudo responder el paciente y alguien más tuvo que hacerlo y en ese caso no tendría certeza de la morbilidad, es por esto que decidimos considerarlo como dato faltante adicional al valor 99 que se indica como "no especificado" lo cual es un valor faltante.
+ 
+```{r}
+muestra[muestra== 98] <- NA
+
+muestra <- muestra %>% mutate(noresp.diab=ifelse(is.na(DIABETES),1,0))
+
+muestra <- muestra %>% mutate(noresp.epoc=ifelse(is.na(EPOC),1,0),noresp.asma=ifelse(is.na(ASMA),1,0),noresp.inmusupr=ifelse(is.na(INMUSUPR),1,0),noresp.hiper=ifelse(is.na(HIPERTENSION),1,0),noresp.otra=ifelse(is.na(OTRA_COM),1,0),noresp.card=ifelse(is.na(CARDIOVASCULAR),1,0),noresp.ren=ifelse(is.na(RENAL_CRONICA),1,0),noresp.tab=ifelse(is.na(TABAQUISMO),1,0))
+
+p.estnores.diab <- mean(muestra$noresp.diab)
+p.estnores.epoc <- mean(muestra$noresp.epoc)
+p.estnores.asma <- mean(muestra$noresp.asma)
+p.estnores.inmun <- mean(muestra$noresp.inmusupr)
+p.estnores.hiper <- mean(muestra$noresp.hiper)
+p.estnores.otra <- mean(muestra$noresp.otra)
+p.estnores.card <- mean(muestra$noresp.card)
+p.estnores.ren <- mean(muestra$noresp.ren)
+p.estnores.tab <- mean(muestra$noresp.tab)
+
+c(p.estnores.diab,p.estnores.epoc,p.estnores.asma,p.estnores.inmun,p.estnores.hiper,p.estnores.otra ,p.estnores.card, p.estnores.ren,p.estnores.tab )
+
+```
+
+En esta muestra la proporción de valores faltantes en las comorbilidades es de: *1%* aproximadamente, son pocos los casos de valores faltantes.
+ 
++ d.	proporción de personas enfermas que requirieron ingresar a Cuidados Intensivos
+
+Observemos si en la muestra hemos tomado valores que incluyan valores de no respuesta, con la función "table" podemos saber la cantidad de distintos datos que tenemos.
+```{r}
+table(muestra$UCI)
+```
+
+
+Observamos que todos los valores presentes nos indican si fue el caso de un paciente que tuvo necesidad de estar en cuidados intensivos o no, por lo tanto no se presentan casos de no respuesta. Lo mismo sucede para el caso del sexo que reportaron los pacientes, y la edad es lo mismo, lo único que llama la atención en principio es que hay casos de  pacientes de edad 0, sin embargo, puede ser por  casos de niños que apenas tienen meses.
+
++ e.	proporción de mujeres y de hombres
+
+```{r}
+table(muestra$SEXO)
+```
+
++ f.	media de edad
+```{r}
+table(muestra$EDAD)
+```
+
+
++ g.	proporción de pacientes ambulatorios y hospitalizados (variable Tipo_paciente)
+```{r}
+table(muestra$TIPO_PACIENTE)
+```
+
+Finalmente podemos observar que hay una mayor cantidad de pacientes ambulatorios que hospitalizados.
+
