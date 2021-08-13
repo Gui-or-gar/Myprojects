@@ -1,0 +1,214 @@
+---
+title: "Exploring the BRFSS data"
+author: "Guillermo Ulises Ortiz-Garin"
+date: "11/8/2018"
+output:
+  html_document:
+    fig_height: 4
+    highlight: pygments
+    theme: spacelab
+  pdf_document: default
+---
+
+### Load packages
+
+```{r load-packages, message = FALSE}
+library(ggplot2)
+library(dplyr)
+library(readxl)
+library(car)
+library(HH)
+library(statsr)
+library(GGally)
+library(sjPlot)
+library(sjmisc)
+library(tinytex)
+library(devtools)
+```
+
+### Load data
+
+```{r load-data}
+load("brfss2013.RData")
+```
+
+
+
+* * *
+
+## Part 1: Data
+The BRFSS obtain their data through standardized surveys. They make a monthly survey and have a data big database of the surveys over the previous years, which helps to have a huge observation per variables through the time. Knowing the earlier, we can analyze how a variable behaves in a specific year or over the years, although, in we'll only use the 2013 database. The survey was make by landline with telephone numbers or cellphones stratified selected by the density stratum. Because this data was collected by stratified random sampling, the results could be generalizable to the population from USA and some territories, also, having a big sample make easy brings a good parameter from this population of interest. Nevertheless, on one hand, this criterion which they used for the studio, enables to control some bias, but still, they cannot control some variables that could influence the answer of some participants, for example, someone could lie in the answers about drinking alcoholic drinks, for some social reason, also, it seems that the volunteer bias also could be present in the study.    
+
+
+* * *
+
+## Part 2: Research questions
+
+**Research quesion 1:**
+
+How is the distribution of the answers of people about the hours they sleep and what are their summaries (Mean, Median, SD and so on) in EUA population?
+ 
+**Research quesion 2:**
+
+What proportion of the sample sleeps more than 4 hours and report a good health or a better? how does this difference looks like among sexes?
+
+
+**Research quesion 3:**
+
+Given the answer of the earlier question, use the binomial model to answer what is the probability that using random sample of 1000 people in EUA at least 600 people sleep more than 4 hours and have a good health or a better?
+
+
+
+* * *
+
+## Part 3: Exploratory data analysis
+
+**Research quesion 1:**
+I'm interested in sleep time variable (sleptim1) and how is the data distribution, so,  I type group function to look at this first:
+
+```{r}
+brfss2013%>% 
+  group_by(sleptim1) %>% 
+  summarise(count = n())
+
+```
+
+ 
+I could see all the values of the variable but something goes wrong because it supposes that the way in which the questions were asked just enable answer in values from 1 to 24. The result of the earlier command show me 10 rows and in the bottom of the result say "18 more rows", so, I have 3 numbers more that could be a "finger error"" in the database.  Let suppose that  this won't affect the variable distribution so I type a histogram ggplot function:
+
+```{r}
+ggplot(data = brfss2013, aes(x = sleptim1)) + geom_histogram ()
+```
+
+
+Apparently, the earlier values are affecting the visualization of the distribution for that's the reason we see two solid bars on the left side. If our aim is just to visualize the distribution we can solve the apparent problem in a pretty easy way using function ggplot functions "xlim ()" ans "bins =" let see if the problem is solved
+```{r}
+ggplot(data = brfss2013, aes(x = sleptim1)) + geom_histogram (bins = 25) +xlim(c(0, 24))
+```
+
+
+
+In effect with this function we apparently solve the problem, but what happens if we want to know the numerical summaries as the mean or IQR of the variable, let see what happen. We can do that using an R function called "summary()" 
+```{r}
+summary(brfss2013$sleptim1)
+```
+
+
+or
+```{r}
+brfss2013 %>% summarise(sleepmean = mean(sleptim1), sleepmedian = median(sleptim1), sleepsd = sd(sleptim1), sleepmin = min(sleptim1), sleepmax = max(sleptim1))
+```
+
+
+as we can see the problem was not solved at all and it is affecting the real numerical summaries as Maximum and Minimum, for that reason the solution is to update the database with the filter function, but first I need to identify which values I need to delete. To see what what are those values, let's see all the rows of this variable with the table function:
+
+```{r}
+table(brfss2013$sleptim1)
+```
+
+
+Now I can see that the error values are "0", "103" and "450" which is pretty obvious because the question regards the hour per day, so, a value of 450 is impossible. The filter function will help us to delete those values:
+
+```{r}
+brfss2013 <- brfss2013 %>% filter(sleptim1 <= 24, sleptim1 >= 1)
+```
+
+
+
+As we can see the earlier  command delete the rows with the values 0, 103 and 450 but as we can note that also delete rows with NA's:
+
+```{r}
+table(brfss2013$sleptim1)
+```
+
+
+Of the 419971 observations now are 484385. This should be fine for our purposes since we are just interested in the real values and for the posterior analysis.
+Lastly, we'll repeat the previous commands of histogram and summaries with the updated database: 
+
+```{r}
+ggplot(data = brfss2013, aes(x = sleptim1)) + geom_histogram (binwidth = 1)
+```
+
+and
+
+```{r}
+brfss2013 %>% summarise(sleepmean = mean(sleptim1), sleepmedian = median(sleptim1), sleepsd = sd(sleptim1), sleepmin = min(sleptim1), sleepmax = max(sleptim1))
+```
+
+Regarding our first question: it seems that the sleep time variable resembles a normal distribution. Because the "n" is very high this is not surprising, and helpful to this shape of the distribution we can get several conclusion about the EUA population and the sleep time by day giving the numerical summaries that we obtained.
+
+**Research quesion 2:**
+
+Now, we want to know what proportion of the sample sleeps more than 4 hours and report a good health or a better. First, we need to look at our next variable "genhlth":
+```{r}
+brfss2013%>% group_by(genhlth) %>% summarise(count = n())
+```
+
+We can see that is a different type of variable, it is a categorical variable. Knowing that and because we are also interested in the "sleptim1"" variable we can look how the people, of a given category, responded in that variable. We use a box plot.
+```{r}
+ggplot(data=brfss2013, aes(x=genhlth, y=sleptim1)) + geom_boxplot()
+```
+
+We can see that all the categories have outliers and the medians are almost centered in the boxes except in the case of people which report a poor health, in this case, it looks like the distribution of that category is right-skewed. Nevertheless, for this work we are only interested in know how many people reported to sleep more than 4 hours and reported a good health or better. First, let's see how many people sleep more than 4 hours: We'll create a new variable called "gdsleptm" which represents what I specify earlier. For doing that we use the mutate function: 
+
+```{r}
+ brfss2013 <- brfss2013 %>% mutate(gdsleptm = ifelse(sleptim1 <= 4, "bad sleep", "good sleep")) 
+```
+
+We type the "group"" command to see it 
+
+```{r}
+brfss2013 %>% group_by(gdsleptm) %>% summarise(count = n())
+```
+
+
+We can see that 96% of the sample meet the criteria but remember we are interested in people that meet this criterion and also report a good, very good or excellent health. For that reason we create a new data frame called "Slepnddhlth" using the filter function:
+
+```{r}
+Slepnddhlth <- brfss2013 %>% filter(
+  gdsleptm == "good sleep",
+  genhlth =="Good" | gdsleptm == "Excellent" | gdsleptm== "Very good")
+```
+
+We see that there are 127213 which meet that criterion, but, let's take a look on the variables genhlth and gdsleptm to see if we did it correctly.
+
+```{r}
+Slepnddhlth %>% group_by(gdsleptm, genhlth) %>% summarise(count = n())
+```
+
+Now I want to know how is the proportion of this criterion between sexes for that reason I'll use a stacked bar plot to see between the sexes which one meets in more proportion that criterion.
+
+```{r}
+ggplot(data=Slepnddhlth, aes(x=gdsleptm, fill=sex)) + geom_bar(position = "stack")
+```
+
+It seems that Females tend to report more that they feel a good health and also sleep more than 4 hours compared to men
+
+The last part (the difference between sexes) was just informative, what I really want to know is what percentage of the total sample meets the criterion of good health and sleep more than 4 hours, for that reason I divided the number of observation that meets the criterion out the total sample (filtered by the errors and NA's).
+
+
+```{r}
+count(Slepnddhlth)/count(brfss2013)
+```
+
+"0.2954551" that our answer which I'll use in the last question
+
+**Research quesion 3:**
+
+Given the answer that I obtained before, I want to use the binomial distribution to answer the next question:
+A survey in 2013 indicates that approximately 30% of the population of EUA report sleep more than 4 hours and feel good or better. What is the probability that, if I take a random sample of 1000 people of EUA population, at least 600 sleep more than 4 hours and feel good or better? The probability of success is p = 0.2954551  and I'm interested in 600 or more people given a sample of 1000. This is pretty easy to answer using the dbinom function 
+
+```{r}
+dbinom(600:1000, size = 1000, prob = 0.2954551)
+```
+
+
+but wait. we have not interested just in a value, we are interested in the upper tail of the distribution. We'll sum the probabilities from 600 to 1000 using the sum function.
+
+
+```{r}
+sum(dbinom(600:1000, size = 1000, prob = 0.2954551))
+```
+
+
+We can conclude that we should expect a tinny probability given the binomial distribution.
