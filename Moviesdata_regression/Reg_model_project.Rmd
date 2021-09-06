@@ -1,0 +1,352 @@
+---
+title: "Modeling and prediction for movies"
+output: 
+  html_document: 
+    fig_height: 4
+    highlight: pygments
+    theme: spacelab
+    author: Guillermo Ulises Ortiz-Garin
+---
+
+
+
+### Packages
+
+```{r load-packages, message = FALSE, warning=FALSE}
+library(ggplot2)
+library(dplyr)
+library(readxl)
+library(statsr)
+library(GGally)
+library(devtools)
+library(SignifReg)
+library(car)
+library(MASS)
+library(leaps)
+library(mice)
+library(lattice)
+library(lmtest)
+library(skimr)
+```
+
+### Load data
+
+```{r load-data}
+load("movies.Rdata")
+```
+
+
+
+* * *
+# Content {.tabset}
+
+## Part 1: Data
+
+Because the data was randomly sampled we can draw some generalizable conclusions regarding the data, nevertheless, in some variables such as the ratings of users on the websites could be biased because, for example,  we are not able to know if some of these votes were from a specific country in which the movie was very popular, meanwhile in other countries not, even, between states could be possible to find this kind of difference, at  least, in this sample we are not able to know where the majority of the votes come from, if this information is available we can use some other samples techniques, such stratified sampling or clustering sampling from countries for example or we can use to draw bigger conclusion as if can assume that all countries behave in the same way. By the moment we use this sample to understand the relationship between the variables provided.
+
+
+
+
+## Part 2: Research question
+
+My question is how the score of the critics and audience behave? because it is pretty obvious that there is a relationship between the score that the critics gave and the score that the users gave on the platforms. For that reason, the idea is trying to predict the audience score based on the critics' scores, then, evaluate this model to create a more complex model.
+
+Is there an association between the critics' scores an the audiences score? How is this relation 
+
+Which factors are significant predictors to predict audience score?
+
+Which is the best model we can create given the data we have?
+
+
+## Part 3: EDA
+
+
+Let's explore the data:
+```{r}
+str(movies)
+```
+
+we can easily identify which variables will not be included in the analysis. Most of  those are stored as character, for example "Title" or the "links" variables .
+
+We can drop those variables from our dataframe:
+
+```{r}
+movies$title <- movies$director <- movies$actor1 <- movies$actor2 <- movies$actor3 <- movies$actor4 <- movies$actor5 <- movies$imdb_url <- movies$rt_url <- NULL
+```
+
+Then we just keep 23 variables useful out the 32 we had. 
+
+```{r}
+str(movies)
+```
+
+
+Now, let's look at our main variables of interest:
+
+We want to take a look at the summary statistics related to these two variables and if there are NA values.
+
+### Summary statistics {.tabset}
+
+#### Data Base and Summary Statistics
+
+```{r}
+summary(movies$critics_score)
+sd (movies$critics_score)
+sum(is.na(movies$critics_score))
+
+summary(movies$audience_score)
+sd(movies$audience_score)
+sum(is.na(movies$audience_score))
+```
+
+This two variables does not have missing values, however in the remaining variables there are some of these:
+
+```{r}
+colSums(is.na(movies))
+```
+
+There are not much NA's so we must check how is the patter of these missing values in order to decide if an imputation is a good option:
+
+```{r}
+md.pattern(movies)
+```
+
+The above graphic tell us that 8 of these observations have NA's in 3 variables related with the DVD release, and another 8 observation have 8 NA's related only with the studio (there is 1 observation without runtime too). If we decided to delete these observations we'll delete 17 complete observation which is pretty low compared with the total number of observations we have in the database. Furthermore, as we will show later, almost all of these variables will be deleted from the analysis so at the end, we will only lost 1 observation, therefore, an imputation is not appropriate in this case. We will continue with the EDA and we we will delete the remaining NA's later; when we'll generate our model.      
+
+#### **Plots**
+
+Because they have the same scale we can visualize and compare their disribution in one plot.
+
+```{r}
+ha<-hist(movies$critics_score)
+hb<-hist(movies$audience_score)
+plot(ha, col=alpha('red',0.5), ylim=c(0,150), main = "Histograms from audience and critics score", xlab = 'score')
+plot(hb, col=alpha('blue',0.5),add=TRUE)
+```
+
+
+The two variables didn't vary a lot to each other. We check also the box plot to look at their behaviors
+
+```{r}
+boxplot(movies$critics_score, movies$audience_score, names = c("Critics Score", "Audience Score"), main= "Boxplot scores")
+```
+
+As we have observed with the ``sd()`` function, it seems that the variance of the ``critics_score``  is a little higher than the ``audience_score``, anyway we can see that even that the histograms looks a little asymmetric, with the box plots we can observe that the skewness is not too high. The next step is to see how is the relation between these two variables that we are interested in. 
+
+
+## Part 4: Modeling 
+
+
+Lets try to answer the first question: is there a relaionship between score audience and critics score?
+first we create a plot with the two variables:
+
+```{r}
+plot(movies$audience_score ~ movies$critics_score)
+```
+
+It seems that, indeed, there is some positive linear relationship. However it's  Let see which is the best line that describe this relation,  remember that this line is which reduce the sum of squares.
+
+
+```{r, fig.width =12 , fig.height= 6, echo=FALSE}
+par(mfrow=c(1,2))
+
+plot(movies$audience_score ~ movies$critics_score)
+abline(lm(movies$audience_score ~ movies$critics_score))
+
+plot_ss(critics_score, audience_score, data = movies, leastSquares = TRUE)
+```
+### Data Modeling {.tabset}
+
+#### **First model**
+
+Just by glance we can say that there are more points at the top right of the  plot and the assumption of equal variance between observations could fail, but let's follow with the analysis to see how this linear model behaves.
+
+The last plot also give us the intercept and the slope of the model. We can also obtain this information by using the summary statistics
+
+```{r}
+
+summary(lm(movies$audience_score ~ movies$critics_score))
+```
+
+
+This table also show us the R-squred which is positive and kind of high for this model. Now we should eximine the model assumptions and see if this model actually meets the requirements for linear regression analysis. 
+```{r, fig.width =7 , fig.height= 7}
+par(mfrow=c(2,2))
+plot(lm(movies$audience_score ~ movies$critics_score))  
+
+```
+
+As we already pointed out before, it seems that indeed, the variance of the observations are indeed not equal. This could be due to many factors that I'll discuss in the conclusion section, by the moment, because is a big sample, we could assume that the assumption of normality in the errors is meet (regarding the Q-Q plot).  To be more confident in this point we can run a <b>Shapiro test</b>:
+
+```{r}
+shapiro.test(lm(movies$audience_score ~ movies$critics_score)$residuals)
+```
+
+According to the shappiro test, we didn't reject the null hypothesis about normality in the errors. However, the $p-vale$ is pretty close to the $\alpha= 0.05$ so we need to be careful about our conclusions if we would decide to use this model. 
+
+#### **Second model** 
+
+Now, there is a lot of information that we can't exclude to understand this relationship, however, we could instead include more variables into the model to create a more complex one. First, we need to look at the numerical variables to see if we can use them or we should exclude some of them.
+
+```{r, fig.width =12 , fig.height= 12, warning=FALSE}
+ggpairs(movies, columns = c(3,6:13, 15,17))
+```
+
+It is difficult to asses a linear relationship between the other variables, it is possible that the only variables which have a linear relationship are those on the bottom right corner, which one is our previous model and the relation to imdb ratings, however, because this variable is also highly correlated with the score of the audience and with the critics, it is possible that we need to avoid to use it because it could give us multicollinearity which we want to avoid. Also, given the description of the variables we can see that there are information that redundant such as the `dvd_rel_*` and the `thtr_rel_*`. It's redundant given the research question because the information of the year, day and the month of releasing the movie or the DVD it's not important when you combined all together as we can see in the above plot. We can select one of those (year, month or day) to include it into the model, so, I decide to use only the year and took a look to the variables using the same plot.
+
+```{r, fig.width =12 , fig.height= 12, warning=FALSE}
+movies1<-movies[,c(-1*c(7,8,10,11))]
+
+ggpairs(movies1, columns = c(3,6:9,11,13))
+```
+
+Now, we can bring a better evaluation about which variables could affect  the multicollinearity in the model which clearly are `critics_score`, `imdb_rating` and either `thtr_rel_year` or `dvd_rel_year`.
+
+```{r}
+movies1<-na.omit(movies1[,c(-1*c(5,7,8,11))])
+```
+
+
+So we decide to create the next model taking in account what we have exposed before. We also delete the `studio` variable because it has a lot of levels which could hinder our analysis and finally we cleaned all the NA's in the database.
+
+```{r}
+Model_Scor <- lm(audience_score ~ ., data = movies1)
+
+summary(Model_Scor)
+```
+
+
+#### **Model selection**
+
+The full model has a pretty high Adjusted R-squared, but this model is not the most parsimonious we can use. For that reason, we will use an elimination method. 
+
+
+```{r}
+Model_Scor <- stepAIC(Model_Scor, direction = "both",trace = F)
+
+summary(Model_Scor)
+```
+
+
+
+
+#### **Final model**
+As we have observed before, our final model will be like:
+
+\[\widehat{AudienceScore}=\widehat{\beta_0} + \widehat{\beta_1} TType + \widehat{\beta_2} ThtrRelY + \widehat{\beta_3} imdbNVotes + \widehat{\beta_4} criticsR + \widehat{\beta_5} audienceR + \widehat{\beta_6} BestPicNom \]
+
+
+
+in which: \[\widehat{\beta}_0= 208\] 
+
+(depending on the title type level) \[\widehat{\beta}_1 = -7.723; \: -12.48\]
+
+\[\widehat{\beta}_2 = -0.07656\] 
+
+\[\widehat{\beta}_3 = 0.00001782\] 
+
+(depending on the critic's rating level) \[\widehat{\beta}_4 = -0.5935; \: -7.379 \]
+
+(depending on the audience's rating level) \[\widehat{\beta}_5 = 29.37\] 
+
+And \[\widehat{\beta}_6 = 4.361 \] if picture was nominated to the best movie of the year or not.
+
+#### **Assessing the Model Assumptions**
+
+First we will use the variance inflation factor (VIF) that is method in which we can look at the multicollinearity between factors. So, we can call to the function and if the "GVIF" is less than 10 we can say that there are not multicollinearity in our factors.
+
+```{r}
+car::vif(Model_Scor)
+```
+
+The command shows us that the variance inflation factor is pretty low for this model so we don't need to worry about this assumption.
+
+
+
+Then we will look at the remaining assumptions
+
+```{r, fig.width =7 , fig.height= 7}
+par(mfrow=c(2,2))
+plot(Model_Scor)
+```
+
+Looking at the first plot we can agree that the independence of errors assumptions holds pretty well. Then looking at the Q-Q plot, we can say that the normality of errors is kind of tricky, nevertheless, if we plot a histogram of the residuals we can see that it's centered at the mean and the distribution is pretty symmetric:
+
+```{r}
+sresid <- resid(Model_Scor)
+
+sfited<- fitted(Model_Scor)
+
+#residual histogram which I mencioned earlier
+hist(sresid)
+```
+
+Regarding outliers, according to the last plot, it seems that there are not influential points to worry about. However, the homocedasticity assumptions could not hold pretty well. So, we'll run a Breuch-Pagant test to asses this assumption.
+
+```{r}
+bptest(Model_Scor)
+```
+
+According to the test $H_0$ is rejected so the homocedasticity assumptions it's not holding. Therefore, we should take in account that when we drawing our conclusion  and using the model to predict.
+
+
+## Part 5: Prediction
+
+**note: the references for this movie are in the last section, I took the data from rotten tomatoes webpage**
+
+Given our model I want to predict the score audience from the movie "Captain America: civil war" based on the details from Rotates tomatoes, that is:
+
+title type: Feature Film
+thtr_rel_year: 2016
+imdb_num_votes: 705,020
+Critics rating: Certified Fresh
+Audience rating: Upright
+Best pic nom: yes
+
+The next model describes the prediction for this movie:
+
+```{r}
+PredicMov <- data.frame(title_type = "Feature Film", thtr_rel_year= 2016, imdb_num_votes= 705020, critics_rating="Certified Fresh", audience_rating = "Upright", best_pic_nom = "yes")
+
+predict(Model_Scor, PredicMov, interval = "predict")
+```
+
+The model predicts a score of 92.206 from the audience, with a confidence level of 95% that the true predicted value is between roughly 73 and 110 (which is not possible because 100 is the maximum value). According to [Rotten tomatotes](https://www.rottentomatoes.com/m/captain_america_civil_war/) this prediction is pretty accurate, nevertheless, for [imbd](https://www.imdb.com/title/tt3498820/) it's not exactly the case, even so, the audience score is still one th range of the confidence interval.
+
+* * *
+
+## Part 6: Conclusion (and discussion)
+
+We saw in the present analysis that a more complex model is need it to predict the audience score. Given the information in the data base we constructed a model which predicts this based on 6 variables. This model was the most parsimonious one according to the selection variables method (based on the AIC criteria). However, we showed that this model violates the homocedasticity assumptions, therefore, we cannot assure that the estimator found is the best according to the OLS method. One possible solution is to look at the transformation we can use on the variables and see if this work, the other option is to use another method of estimation.
+
+
+## References
+
+http://oscar.go.com/news//best-picture-nominations-2016-oscars
+
+https://www.rottentomatoes.com/m/captain_america_civil_war/
+
+https://www.imdb.com/title/tt3498820/
+
+
+<style>
+
+h1{
+  color: #F08080;
+  opacity: 0.8
+  font-weight: bold;
+  }
+  
+h3{
+  color: #52BE80;
+  font-weight: bold;
+}  
+
+
+
+
+}
+</style>  
+  
+
+---
